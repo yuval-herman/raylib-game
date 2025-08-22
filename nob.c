@@ -6,12 +6,13 @@
 #define SRC_FOLDER "src/"
 
 #if defined(_MSC_VER)
-#define nob_cc_flags(cmd) nob_cmd_append(cmd, "/W4", "/nologo", "/D_CRT_SECURE_NO_WARNINGS")
-#define nob_linker(cmd) cmd_append(cmd, "-I./raylib/windows-build/include", "-L./raylib/windows-build/lib", "-lraylib")
+#define nob_cc_flags(cmd) nob_cmd_append(cmd, "/W4", "/Zi", "/nologo", "/D_CRT_SECURE_NO_WARNINGS")
+#define nob_cc_include(cmd) cmd_append(cmd, "/I./raylib/windows-build/include", "/I./box2d/windows-build/include")
+#define nob_linker(cmd) cmd_append(cmd, "/LIBPATH:./raylib/windows-build/lib", "raylib.lib", "/LIBPATH:./box2d/windows-build/lib", "box2d.lib")
 #else
-#define nob_cc_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-D_POSIX_SOURCE", "-ggdb");
-#define cc_include(cmd) cmd_append(cmd, "-I./raylib/linux-build/include")
-#define nob_linker(cmd) cmd_append(cmd, "-L./raylib/linux-build/lib", "-lraylib", "-lm")
+#define nob_cc_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Wno-override-init-side-effects", "-D_POSIX_SOURCE", "-ggdb");
+#define nob_cc_include(cmd) cmd_append(cmd, "-I./raylib/linux-build/include", "-I./box2d/linux-build/include")
+#define nob_linker(cmd) cmd_append(cmd, "-L./raylib/linux-build/lib", "-lraylib", "-L./box2d/linux-build/lib", "-lbox2d", "-lm")
 #endif
 
 #include "nob.h"
@@ -26,6 +27,7 @@ int main(int argc, char **argv)
     Cmd cmd = {0};
     nob_cc(&cmd);
     nob_cc_flags(&cmd);
+    nob_cc_include(&cmd);
     nob_cc_output(&cmd, BUILD_FOLDER "main");
     nob_cc_inputs(&cmd, SRC_FOLDER "main.c");
     nob_linker(&cmd);
