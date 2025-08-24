@@ -3,6 +3,8 @@
         "raylib"
     ],
     "files.associations": {
-        "nob.h": "c"
+        "nob.h": "c",
+        "chrono": "c",
+        "functional": "c"
     }
 }

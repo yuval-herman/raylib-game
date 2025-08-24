@@ -65,23 +65,36 @@ int main(int argc, char **argv)
         exit(0);
     }
 
+    if (!mkdir_if_not_exists(BUILD_FOLDER))
+        return 1;
+
+    nob_log(INFO, "Compilation target: %s", *target);
+
+    Cmd cmd = {0};
+
     if (strcmp(*target, "windows") == 0)
     {
-        nob_log(ERROR, "Windows target is being worked on, but is currently not available");
-        exit(1);
+#ifdef _WIN32
+        nob_cc(&cmd);
+#else
+        nob_cmd_append(&cmd, "x86_64-w64-mingw32-gcc");
+#endif
     }
-    else if (strcmp(*target, "linux") != 0)
+    else if (strcmp(*target, "linux") == 0)
+    {
+#ifdef _WIN32
+        nob_log(ERROR, "Cross compilation on windows is not supported");
+        exit(1);
+#else
+        nob_cc(&cmd);
+#endif
+    }
+    else
     {
         nob_log(ERROR, "Target '%s' is not supported", *target);
         exit(1);
     }
 
-    if (!mkdir_if_not_exists(BUILD_FOLDER))
-        return 1;
-
-    Cmd cmd = {0};
-
-    nob_cc(&cmd);
     nob_cc_flags(&cmd);
     nob_cc_include(&cmd, *target);
     nob_cc_output(&cmd, BUILD_FOLDER "main");
