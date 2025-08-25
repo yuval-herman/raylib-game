@@ -13,7 +13,15 @@ int main(void)
     const int screenHeight = 450;
 
     SetTraceLogLevel(LOG_WARNING);
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "empty game, full potential");
+#ifdef MOVE_WINDOW
+    {
+        int monitor = GetCurrentMonitor();
+        int mon_width = GetMonitorWidth(monitor);
+        SetWindowPosition(mon_width - screenWidth, 0);
+    }
+#endif
 
     SetTraceLogLevel(LOG_INFO);
     SetTargetFPS(60);
