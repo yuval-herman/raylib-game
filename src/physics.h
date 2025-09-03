@@ -1,49 +1,23 @@
-#if !defined(PHYSICS_HEADER)
+#ifndef PHYSICS_HEADER
 #define PHYSICS_HEADER
 
 #include "assert.h"
 #include "box2d.h"
+#include "raylib.h"
 
-b2WorldId worldId;
-float timeStep = 1.0f / 60.0f;
-int subStepCount = 4;
+#define TIME_STEP 1.0f / 60.0f
+#define SUB_STEP_COUNT 4
+#define GROUND_EXTENT 1000
 
-void initWorld()
-{
-    b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = (b2Vec2){0.0f, -10.0f};
-    worldId = b2CreateWorld(&worldDef);
-    assert(b2World_IsValid(worldId));
-}
+extern b2WorldId world_id;
+extern b2BodyId ground_id;
 
-typedef struct MakeBodyParams
-{
-    b2BodyDef body;
-    b2Polygon polygon;
-    b2ShapeDef shape;
-} MakeBodyParams;
+void physics_init_world();
 
-#define makeBody(...) _makeBody((MakeBodyParams){ \
-    .body = b2DefaultBodyDef(),                   \
-    .shape = b2DefaultShapeDef(),                 \
-    __VA_ARGS__})
-
-b2BodyId _makeBody(MakeBodyParams params)
-{
-    b2BodyId bodyId = b2CreateBody(worldId, &params.body);
-    assert(b2Body_IsValid(bodyId));
-
-    b2CreatePolygonShape(bodyId, &params.shape, &params.polygon);
-
-    return bodyId;
-}
-
-#define setRaylibPos(p1, p2) \
-    do                       \
-    {                        \
-        p1.x = p2.x;         \
-        p1.y = -p2.y;        \
-    } while (0)
 #define getRectOrigin(rect) (Vector2){rect.width / 2, rect.height / 2}
+
+Vector2 b2rVec(b2Vec2 vec);
+
+b2Vec2 r2bVec(b2Vec2 vec);
 
 #endif // PHYSICS_HEADER

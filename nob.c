@@ -38,6 +38,8 @@
 #define DEFAULT_TARGET "linux"
 #endif
 
+#define FLAG_SET(flag) flag ? "set" : "unset"
+
 void usage(FILE *stream)
 {
     fprintf(stream, "Usage: ./nob [OPTIONS]\n");
@@ -72,6 +74,8 @@ int main(int argc, char **argv)
 
     nob_log(INFO, "==================================");
     nob_log(INFO, "Compilation target: %s", *target);
+    nob_log(INFO, "Flags:");
+    nob_log(INFO, "\t\tmove_window: %s", FLAG_SET(*move_window));
     nob_log(INFO, "==================================");
 
     Cmd cmd = {0};
@@ -124,7 +128,9 @@ int main(int argc, char **argv)
             cmd_append(&cmd, "-DMOVE_WINDOW");
         nob_cc_include(&cmd, *target);
         nob_cc_output(&cmd, OUTPUT_FILE);
-        nob_cc_inputs(&cmd, SRC_FOLDER "main.c");
+        nob_cc_inputs(&cmd,
+                      SRC_FOLDER "main.c",
+                      SRC_FOLDER "physics.c", );
         nob_linker(&cmd, *target);
 
         if (!cmd_run(&cmd))
