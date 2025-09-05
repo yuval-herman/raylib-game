@@ -1,7 +1,9 @@
+#include <stdio.h>
+
 #include "raylib.h"
 #include "assert.h"
 #include "physics.h"
-#include <stdio.h>
+#include "creature.h"
 
 int main(void)
 {
@@ -36,6 +38,10 @@ int main(void)
     Vector2 groundBoxRectOrigin = getRectOrigin(groundBoxRect);
 
     // #==============================================================
+    //                     CREATURE INITIALIZATION
+    // #==============================================================
+    Creature creature = creature_make();
+    // #==============================================================
     //                           GAME LOOP
     // #==============================================================
 
@@ -48,6 +54,8 @@ int main(void)
         b2World_Step(world_id, TIME_STEP, SUB_STEP_COUNT);
 
         DrawRectanglePro(groundBoxRect, groundBoxRectOrigin, 0, BLACK);
+        creature_update(&creature);
+        creature_draw(creature);
 
         EndMode2D();
         EndDrawing();

@@ -130,7 +130,8 @@ int main(int argc, char **argv)
         nob_cc_output(&cmd, OUTPUT_FILE);
         nob_cc_inputs(&cmd,
                       SRC_FOLDER "main.c",
-                      SRC_FOLDER "physics.c", );
+                      SRC_FOLDER "physics.c",
+                      SRC_FOLDER "creature.c", );
         nob_linker(&cmd, *target);
 
         if (!cmd_run(&cmd))

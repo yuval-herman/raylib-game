@@ -14,7 +14,8 @@ extern b2BodyId ground_id;
 
 void physics_init_world();
 
-#define getRectOrigin(rect) (Vector2){rect.width / 2, rect.height / 2}
+#define getRectOrigin(rect) \
+    (Vector2){rect.width / 2, 0}
 
 Vector2 b2rVec(b2Vec2 vec);
 
