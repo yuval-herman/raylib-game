@@ -3,7 +3,9 @@
 #include <stdlib.h>
 
 const float default_node_radius = 2.0f;
-const float default_motor_speed = 10.0f;
+const float default_motor_speed = 1.0f;
+const float max_motor_speed = -100.0f;
+const float min_motor_speed = 100.0f;
 const float default_motor_force = 200.0f;
 
 b2BodyId make_node(b2Vec2 pos, float radius)
@@ -25,26 +27,24 @@ b2BodyId make_node(b2Vec2 pos, float radius)
     return body_id;
 }
 
-b2JointId connect_nodes(b2BodyId node1, b2BodyId node2)
+b2JointId connect_nodes(b2BodyId node1, b2BodyId node2, JointData *joint_data)
 {
     b2DistanceJointDef joint_def = b2DefaultDistanceJointDef();
 
     joint_def.base.bodyIdA = node1;
     joint_def.base.bodyIdB = node2;
+    joint_def.base.userData = joint_data;
 
     b2Vec2 anchorA = b2Body_GetWorldPoint(node1, b2Vec2_zero);
     b2Vec2 anchorB = b2Body_GetWorldPoint(node2, b2Vec2_zero);
     joint_def.minLength = default_node_radius;
     joint_def.maxLength = b2Distance(anchorA, anchorB);
 
-    // joint_def.hertz = 2.0f;
-    // joint_def.dampingRatio = 0.5f;
-
     joint_def.enableSpring = true;
     joint_def.enableLimit = true;
     joint_def.enableMotor = true;
 
-    joint_def.motorSpeed = default_motor_speed;
+    joint_def.motorSpeed = joint_data->rest_motor_speed;
     joint_def.maxMotorForce = default_motor_force;
 
     return b2CreateDistanceJoint(world_id, &joint_def);
@@ -52,22 +52,29 @@ b2JointId connect_nodes(b2BodyId node1, b2BodyId node2)
 
 Creature creature_make()
 {
-    b2BodyId *node_ids = malloc(sizeof node_ids[0] * 3);
+    unsigned int node_amount = 3;
+    b2BodyId *node_ids = malloc(sizeof node_ids[0] * node_amount);
     node_ids[0] = make_node((b2Vec2){.x = 5, .y = 15}, 0);
     node_ids[1] = make_node((b2Vec2){.x = 10, .y = 15}, 0);
     node_ids[2] = make_node((b2Vec2){.x = 7.5, .y = 10}, 0);
 
-    b2JointId *joint_ids = malloc(sizeof joint_ids[0] * 3);
-    joint_ids[0] = connect_nodes(node_ids[0], node_ids[1]);
-    joint_ids[1] = connect_nodes(node_ids[1], node_ids[2]);
-    joint_ids[2] = connect_nodes(node_ids[2], node_ids[0]);
+    unsigned int joint_amount = 3;
+    b2JointId *joint_ids = malloc(sizeof joint_ids[0] * joint_amount);
+    JointData *joints_data = malloc(sizeof joints_data[0] * joint_amount);
+    joints_data[0] = (JointData){.rest_motor_speed = default_motor_speed};
+    joint_ids[0] = connect_nodes(node_ids[0], node_ids[1], joints_data);
+    joints_data[1] = (JointData){.rest_motor_speed = default_motor_speed};
+    joint_ids[1] = connect_nodes(node_ids[1], node_ids[2], (joints_data + 1));
+    joints_data[2] = (JointData){.rest_motor_speed = default_motor_speed};
+    joint_ids[2] = connect_nodes(node_ids[2], node_ids[0], (joints_data + 2));
 
     return (Creature){
-        .node_amount = 3,
+        .node_amount = node_amount,
         .node_ids = node_ids,
-        .joint_amount = 3,
+
+        .joint_amount = joint_amount,
         .joint_ids = joint_ids,
-    };
+        .joints_data = joints_data};
 }
 // void creature_destroy()
 // {
@@ -103,17 +110,18 @@ void creature_update(Creature *creature)
 {
     if (IsKeyDown(KEY_RIGHT))
     {
-        b2DistanceJoint_SetMotorSpeed(creature->joint_ids[0], -1);
+        b2DistanceJoint_SetMotorSpeed(creature->joint_ids[0], min_motor_speed);
     }
     else if (IsKeyDown(KEY_LEFT))
     {
-        b2DistanceJoint_SetMotorSpeed(creature->joint_ids[0], 1);
+        b2DistanceJoint_SetMotorSpeed(creature->joint_ids[0], max_motor_speed);
     }
-    else
+    else if (IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_LEFT))
     {
         for (size_t i = 0; i < creature->joint_amount; i++)
         {
-            b2DistanceJoint_SetMotorSpeed(creature->joint_ids[i], default_motor_speed);
+            JointData *joint_data = b2Joint_GetUserData(creature->joint_ids[i]);
+            b2DistanceJoint_SetMotorSpeed(creature->joint_ids[i], joint_data->rest_motor_speed);
         }
     }
 }
