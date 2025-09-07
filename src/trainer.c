@@ -3,7 +3,19 @@
 
 #include "trainer.h"
 
-#define POP_SIZE 100
+#define ARRAY_COUNT(A) (int)(sizeof(A) / sizeof(A[0]))
+
+#define POP_SIZE 200
+#define EVOLUTION_GENERATIONS 50
+
+#define MAX_EVALUATION_STEPS (60 * 15)
+#define MIN_EVALUATION_STEPS (15)
+#define EVALUATION_TESTS (10)
+
+#define TOURNAMENT_SIZE (POP_SIZE / 10)
+#define MUTATION_RATE 0.025
+#define MUTATION_AMOUNT 0.5
+static_assert(MUTATION_AMOUNT <= 1);
 
 // Get average node position
 b2Vec2 get_avg_position(Creature *creature)
@@ -48,24 +60,50 @@ void free_population(genann **population)
 
 double evaluate(Creature *creature)
 {
+    // TODO: I'm ignoring UP for now since it's a bit complicated
+    CreatureInstruction inst_arr[] = {INST_NONE, INST_LEFT, INST_RIGHT};
+
+    double fitness = 0;
+    CreatureInstruction inst;
+
     creature_reset(creature);
-    double last_pos = get_avg_position(creature).x;
-    for (size_t i = 0; i < 60 * 15; i++)
+    for (int test = 0; test < EVALUATION_TESTS; test++)
     {
-        creature_think(creature, GO_RIGHT);
-        b2World_Step(world_id, TIME_STEP, SUB_STEP_COUNT);
-        double pos = get_avg_position(creature).x;
-        if (fabs(last_pos - pos) < FLT_EPSILON)
-            break;
-        last_pos = pos;
+        inst = inst_arr[GetRandomValue(0, ARRAY_COUNT(inst_arr) - 1)];
+        b2Vec2 start_pos = get_avg_position(creature);
+        double last_pos = start_pos.x;
+        const int steps = GetRandomValue(MIN_EVALUATION_STEPS, MAX_EVALUATION_STEPS);
+        for (int i = 0; i < steps; i++)
+        {
+            creature_think(creature, inst);
+            b2World_Step(world_id, TIME_STEP, SUB_STEP_COUNT);
+            b2Vec2 pos = get_avg_position(creature);
+
+            // TODO: actually check if the creature is grounded
+            if (fabs(last_pos - pos.x) < FLT_EPSILON || pos.y < 1.1)
+                break;
+            last_pos = pos.x;
+        }
+
+        double distance = fabs(last_pos - start_pos.x);
+        bool moved_right = last_pos > start_pos.x;
+        bool should_move_right = inst == INST_RIGHT;
+        double test_fitness = distance * (moved_right == should_move_right ? 1.0 : -2.0);
+        fitness += test_fitness;
+
+        // TraceLog(LOG_INFO, "Test %d: Inst=%d, Distance=%.2f, Moved%s, Should%s, Fitness=%.2f",
+        //          test, inst, distance,
+        //          moved_right ? "Right" : "Left",
+        //          should_move_right ? "Right" : "Left",
+        //          test_fitness);
     }
-    return last_pos;
+    return fitness;
 }
 
 genann *select(genann **population, double *fitnesses)
 {
     size_t index_max = GetRandomValue(0, POP_SIZE - 1);
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < TOURNAMENT_SIZE; i++)
     {
         size_t index_check = GetRandomValue(0, POP_SIZE - 1);
         if (fitnesses[index_max] < fitnesses[index_check])
@@ -90,7 +128,10 @@ void mutation(genann *ind, double mutation_rate)
     for (int i = 0; i < ind->total_weights; ++i)
     {
         if (GENANN_RANDOM() < mutation_rate)
-            ind->weight[i] = GENANN_RANDOM() - 0.5;
+        {
+            ind->weight[i] += (GENANN_RANDOM() - 0.5) * MUTATION_AMOUNT;
+            b2ClampFloat(ind->weight[i], -0.5, 0.5);
+        }
     }
 }
 
@@ -104,8 +145,9 @@ void creature_train(Creature *creature)
 
     genann_free(creature->brain);
 
-    for (int gens = 0; gens < 100; gens++)
+    for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
+        TraceLog(LOG_INFO, "training %d generation", generation);
         for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
         {
             creature->brain = population[pop_i];
@@ -113,7 +155,7 @@ void creature_train(Creature *creature)
             if (max_fit < fitnesses[pop_i])
             {
                 max_fit = fitnesses[pop_i];
-                TraceLog(LOG_INFO, "max fit increased %g", max_fit);
+                TraceLog(LOG_INFO, "gen %d, max fit increased %g", generation, max_fit);
             }
         }
         for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
@@ -122,7 +164,7 @@ void creature_train(Creature *creature)
             genann *ind_b = select(population, fitnesses);
 
             crossover(*ind_a, *ind_b, population_b_gen[pop_i]);
-            mutation(population_b_gen[pop_i], 0.025);
+            mutation(population_b_gen[pop_i], MUTATION_RATE);
         }
 
         genann **temp;

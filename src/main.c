@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "raylib.h"
 #include "assert.h"
@@ -10,12 +11,26 @@
 int main(void)
 {
     // #==============================================================
+    //                       BOX2D INITIALIZATION
+    // #==============================================================
+    physics_init_world();
+    Rectangle groundBoxRect = {.width = GROUND_EXTENT * 2, .height = 20};
+    Vector2 groundBoxRectOrigin = getRectOrigin(groundBoxRect);
+
+    // #==============================================================
+    //                     CREATURE INITIALIZATION
+    // #==============================================================
+    Creature creature = creature_make();
+    creature_train(&creature);
+
+    // #==============================================================
     //                       RAYLIB INITIALIZATION
     // #==============================================================
     const int screenWidth = 1200;
     const int screenHeight = 600;
 
-    srand(123456789);
+    SetRandomSeed(time(0));
+    srand(time(0));
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "empty game, full potential");
@@ -32,19 +47,6 @@ int main(void)
     SetTargetFPS(60);
 
     Camera2D camera = {.zoom = 10, .offset = (Vector2){.x = screenWidth / 2, .y = 300}};
-
-    // #==============================================================
-    //                       BOX2D INITIALIZATION
-    // #==============================================================
-    physics_init_world();
-    Rectangle groundBoxRect = {.width = GROUND_EXTENT * 2, .height = 20};
-    Vector2 groundBoxRectOrigin = getRectOrigin(groundBoxRect);
-
-    // #==============================================================
-    //                     CREATURE INITIALIZATION
-    // #==============================================================
-    Creature creature = creature_make();
-    creature_train(&creature);
 
     // #==============================================================
     //                           GAME LOOP

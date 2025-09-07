@@ -29,9 +29,10 @@ typedef struct Creature
 
 typedef enum CreatureInstruction
 {
-    GO_LEFT,
-    GO_RIGHT,
-    GO_UP,
+    INST_NONE,
+    INST_LEFT,
+    INST_RIGHT,
+    INST_UP,
 } CreatureInstruction;
 
 Creature creature_make();
