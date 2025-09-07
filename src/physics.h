@@ -9,6 +9,8 @@
 #define SUB_STEP_COUNT 4
 #define GROUND_EXTENT 1000
 
+#define ARRAY_COUNT(A) (int)(sizeof(A) / sizeof(A[0]))
+
 extern b2WorldId world_id;
 extern b2BodyId ground_id;
 

@@ -12,15 +12,20 @@
 
 typedef struct JointData
 {
+    unsigned int node_a_idx;
+    unsigned int node_b_idx;
     float rest_motor_speed;
 } JointData;
 
 typedef struct Creature
 {
     genann *brain;
+    // Used in creature_think
+    double *brain_inputs;
 
     b2BodyId *node_ids;
     unsigned int node_amount;
+    b2Vec2 *original_node_positions;
 
     b2JointId *joint_ids;
     JointData *joints_data;
@@ -35,7 +40,10 @@ typedef enum CreatureInstruction
     INST_UP,
 } CreatureInstruction;
 
-Creature creature_make();
+Creature creature_make(b2Vec2 *node_positions,
+                       unsigned int node_amount,
+                       JointData *joints,
+                       unsigned int joint_amount);
 void creature_reset(Creature *creature);
 // Creature is emptied and can be safely reused after a call to this function
 void creature_destroy(Creature *creature);

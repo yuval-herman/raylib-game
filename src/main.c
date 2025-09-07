@@ -10,6 +10,7 @@
 
 int main(void)
 {
+    srand(time(0));
     // #==============================================================
     //                       BOX2D INITIALIZATION
     // #==============================================================
@@ -20,7 +21,16 @@ int main(void)
     // #==============================================================
     //                     CREATURE INITIALIZATION
     // #==============================================================
-    Creature creature = creature_make();
+    b2Vec2 node_pos[] = {{1, 7.5}, {5, 0}, {9, 7.5}, {5, 3.25}};
+    JointData joints[] = {
+        {0, 1, 0},
+        {1, 2, 0},
+        {2, 0, 0},
+        {3, 1, 0},
+        {3, 2, 0},
+        {3, 0, 0},
+    };
+    Creature creature = creature_make(node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
     creature_train(&creature);
 
     // #==============================================================
@@ -29,8 +39,6 @@ int main(void)
     const int screenWidth = 1200;
     const int screenHeight = 600;
 
-    SetRandomSeed(time(0));
-    srand(time(0));
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "empty game, full potential");

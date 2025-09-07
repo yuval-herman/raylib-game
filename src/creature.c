@@ -3,7 +3,7 @@
 #include "creature.h"
 #include "raymath.h"
 
-const float default_node_radius = 2.0f;
+const float default_node_radius = 1.0f;
 const float default_motor_speed = 1.0f;
 const float max_motor_speed = 100.0f;
 const float min_motor_speed = -100.0f;
@@ -59,7 +59,7 @@ b2BodyId make_node(b2Vec2 pos, float radius)
     shape_def.material.friction = 1;
     shape_def.density = 1;
 
-    b2Circle circle = {.center = b2Vec2_zero, .radius = radius || default_node_radius};
+    b2Circle circle = {.center = b2Vec2_zero, .radius = radius ? radius : default_node_radius};
     b2CreateCircleShape(body_id, &shape_def, &circle);
 
     return body_id;
@@ -88,25 +88,27 @@ b2JointId connect_nodes(b2BodyId node1, b2BodyId node2, JointData *joint_data)
     return b2CreateDistanceJoint(world_id, &joint_def);
 }
 
-Creature creature_make()
+Creature creature_make(b2Vec2 *node_positions, unsigned int node_amount, JointData *joints, unsigned int joint_amount)
 {
     // Nodes
-    unsigned int node_amount = 3;
     b2BodyId *node_ids = malloc(sizeof node_ids[0] * node_amount);
-    node_ids[0] = make_node((b2Vec2){.x = 5, .y = 5}, 0);
-    node_ids[1] = make_node((b2Vec2){.x = 10, .y = 5}, 0);
-    node_ids[2] = make_node((b2Vec2){.x = 7.5, .y = 0}, 0);
+    for (size_t node_i = 0; node_i < node_amount; node_i++)
+    {
+        node_ids[node_i] = make_node(node_positions[node_i], 0);
+    }
 
     // Joints
-    unsigned int joint_amount = 3;
     b2JointId *joint_ids = malloc(sizeof joint_ids[0] * joint_amount);
     JointData *joints_data = malloc(sizeof joints_data[0] * joint_amount);
-    joints_data[0] = (JointData){.rest_motor_speed = default_motor_speed};
-    joint_ids[0] = connect_nodes(node_ids[0], node_ids[1], joints_data);
-    joints_data[1] = (JointData){.rest_motor_speed = default_motor_speed};
-    joint_ids[1] = connect_nodes(node_ids[1], node_ids[2], (joints_data + 1));
-    joints_data[2] = (JointData){.rest_motor_speed = default_motor_speed};
-    joint_ids[2] = connect_nodes(node_ids[2], node_ids[0], (joints_data + 2));
+    for (size_t joint_i = 0; joint_i < joint_amount; joint_i++)
+    {
+        joints_data[joint_i] = joints[joint_i];
+        if (joints_data[joint_i].rest_motor_speed == 0)
+            joints_data[joint_i].rest_motor_speed = default_motor_speed;
+
+        joint_ids[joint_i] = connect_nodes(node_ids[joints[joint_i].node_a_idx],
+                                           node_ids[joints[joint_i].node_b_idx], joints_data + joint_i);
+    }
 
     // Brain
     // Inputs:
@@ -117,8 +119,9 @@ Creature creature_make()
     // Outputs:
     // motor speeds for joints
     int inputs = node_amount * 4 + 2 + 3;
-    int hidden_layers = 1;
-    int hidden_nodes = inputs;
+    double *brain_inputs = malloc(sizeof(double) * inputs);
+    int hidden_layers = 2;
+    int hidden_nodes = inputs * 2;
     int outputs = joint_amount;
     genann *ann = genann_init(inputs,
                               hidden_layers,
@@ -128,12 +131,14 @@ Creature creature_make()
     return (Creature){
         .node_amount = node_amount,
         .node_ids = node_ids,
+        .original_node_positions = node_positions,
 
         .joint_amount = joint_amount,
         .joint_ids = joint_ids,
         .joints_data = joints_data,
 
         .brain = ann,
+        .brain_inputs = brain_inputs,
     };
 }
 // void creature_destroy()
@@ -141,24 +146,28 @@ Creature creature_make()
 //     // TODO
 // }
 
+void creature_reset_motors(Creature *creature)
+{
+    for (size_t i = 0; i < creature->joint_amount; i++)
+    {
+        JointData *joint_data = b2Joint_GetUserData(creature->joint_ids[i]);
+        b2DistanceJoint_SetMotorSpeed(creature->joint_ids[i], joint_data->rest_motor_speed);
+    }
+}
+
 // Reset all nodes and joints, does not reset the brain
 void creature_reset(Creature *creature)
 {
     // Nodes
-    b2Body_SetTransform(creature->node_ids[0], (b2Vec2){.x = 5, .y = 5}, b2Rot_identity);
-    b2Body_SetLinearVelocity(creature->node_ids[0], b2Vec2_zero);
-    b2Body_SetAngularVelocity(creature->node_ids[0], 0);
-    b2Body_SetTransform(creature->node_ids[1], (b2Vec2){.x = 10, .y = 5}, b2Rot_identity);
-    b2Body_SetLinearVelocity(creature->node_ids[1], b2Vec2_zero);
-    b2Body_SetAngularVelocity(creature->node_ids[1], 0);
-    b2Body_SetTransform(creature->node_ids[2], (b2Vec2){.x = 7.5, .y = 0}, b2Rot_identity);
-    b2Body_SetLinearVelocity(creature->node_ids[2], b2Vec2_zero);
-    b2Body_SetAngularVelocity(creature->node_ids[2], 0);
+    for (size_t node_i = 0; node_i < creature->node_amount; node_i++)
+    {
+        b2Body_SetTransform(creature->node_ids[node_i], creature->original_node_positions[node_i], b2Rot_identity);
+        b2Body_SetLinearVelocity(creature->node_ids[node_i], b2Vec2_zero);
+        b2Body_SetAngularVelocity(creature->node_ids[node_i], 0);
+    }
 
     // Joints
-    b2DistanceJoint_SetMotorSpeed(creature->joint_ids[0], ((JointData *)b2Joint_GetUserData(creature->joint_ids[0]))->rest_motor_speed);
-    b2DistanceJoint_SetMotorSpeed(creature->joint_ids[1], ((JointData *)b2Joint_GetUserData(creature->joint_ids[1]))->rest_motor_speed);
-    b2DistanceJoint_SetMotorSpeed(creature->joint_ids[2], ((JointData *)b2Joint_GetUserData(creature->joint_ids[2]))->rest_motor_speed);
+    creature_reset_motors(creature);
 }
 
 void creature_draw(Creature creature)
@@ -188,35 +197,22 @@ void creature_draw(Creature creature)
     }
 }
 
-void creature_reset_motors(Creature *creature)
-{
-    for (size_t i = 0; i < creature->joint_amount; i++)
-    {
-        JointData *joint_data = b2Joint_GetUserData(creature->joint_ids[i]);
-        b2DistanceJoint_SetMotorSpeed(creature->joint_ids[i], joint_data->rest_motor_speed);
-    }
-}
-
 void creature_think(Creature *creature, CreatureInstruction inst)
 {
-    if (inst == INST_NONE)
-    {
-        creature_reset_motors(creature);
-        return;
-    }
-
     // first are nod position, then instruction flags
-    double brain_inputs[17];
-    b2Vec2 center = get_node_rel_positions(creature, brain_inputs);
-    get_node_velocities(creature, brain_inputs + 6);
-    brain_inputs[12] = center.x;
-    brain_inputs[13] = center.y;
+    double *inputs = creature->brain_inputs;
+    b2Vec2 center = get_node_rel_positions(creature, inputs);
+    inputs += creature->node_amount * 2;
+    get_node_velocities(creature, inputs);
+    inputs += creature->node_amount * 2;
+    inputs[0] = center.x;
+    inputs[1] = center.y;
 
-    brain_inputs[14] = inst == INST_LEFT;
-    brain_inputs[15] = inst == INST_RIGHT;
-    brain_inputs[16] = inst == INST_UP;
+    inputs[2] = inst == INST_LEFT;
+    inputs[3] = inst == INST_RIGHT;
+    inputs[4] = inst == INST_NONE;
 
-    const double *motor_speeds = genann_run(creature->brain, brain_inputs);
+    const double *motor_speeds = genann_run(creature->brain, creature->brain_inputs);
     for (size_t i = 0; i < creature->joint_amount; i++)
     {
         float motor_speed = Remap((float)motor_speeds[i], 0, 1, min_motor_speed, max_motor_speed);
