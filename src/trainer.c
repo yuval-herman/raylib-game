@@ -3,17 +3,6 @@
 
 #include "trainer.h"
 
-#define POP_SIZE 70
-#define TOURNAMENT_SIZE (POP_SIZE / 10)
-#define EVOLUTION_GENERATIONS 25
-
-#define EVALUATION_STEPS (60 * 10)
-#define EVALUATION_TESTS (6)
-
-#define MUTATION_RATE 0.025
-#define MUTATION_AMOUNT 0.5
-static_assert(MUTATION_AMOUNT <= 1);
-
 // Get average node position
 b2Vec2 get_avg_position(Creature *creature)
 {
@@ -36,22 +25,35 @@ b2Vec2 get_avg_position(Creature *creature)
 // Crossover
 // Mutation
 
-genann **init_population(Creature *creature)
+genann *init_population(Creature *creature)
 {
-    genann **population = malloc(sizeof(genann *) * POP_SIZE);
+    genann *ann = creature->brain;
+
+    const int weights_size = sizeof(double) * (ann->total_weights + ann->total_neurons + (ann->total_neurons - ann->inputs));
+    const int size = sizeof(genann) + weights_size;
+    // Allocate continuos memory block for all ann and their weights with this layout:
+    // [genann structs][weights blocks indexed by i]
+    void *population = malloc(size * POP_SIZE);
+
+    // Pointer with 1 byte alignment to the begining of the weights section
+    char *weights_start = (char *)(((genann *)population) + POP_SIZE);
     for (size_t i = 0; i < POP_SIZE; i++)
     {
-        population[i] = genann_copy(creature->brain);
-        genann_randomize(population[i]);
+        ((genann *)population)[i] = *ann;
+        /* Set pointers. */
+        ((genann *)population)[i].weight = (double *)(weights_start + weights_size * i);
+        ((genann *)population)[i].output = ((genann *)population)[i].weight + ((genann *)population)[i].total_weights;
+        ((genann *)population)[i].delta = ((genann *)population)[i].output + ((genann *)population)[i].total_neurons;
+        genann_randomize(((genann *)population) + i);
     }
+
     return population;
 }
-void free_population(genann **population)
+void free_population(genann *population)
 {
-    for (size_t i = 0; i < POP_SIZE; i++)
-    {
-        genann_free(population[i]);
-    }
+    // Since I am a psychopath, the entire population is
+    // a single memory block and can be free'd with one free call.
+    // You're welcome
     free(population);
 }
 
@@ -105,7 +107,7 @@ double evaluate(Creature *creature)
     return fitness;
 }
 
-genann *select(genann **population, double *fitnesses)
+genann *select(genann *population, double *fitnesses)
 {
     size_t index_max = GetRandomValue(0, POP_SIZE - 1);
     for (int i = 0; i < TOURNAMENT_SIZE; i++)
@@ -115,7 +117,7 @@ genann *select(genann **population, double *fitnesses)
             index_max = index_check;
     }
 
-    return population[index_max];
+    return population + index_max;
 }
 
 void crossover(const genann *ind_a, const genann *ind_b, genann *child)
@@ -143,8 +145,8 @@ void mutation(genann *ind, double mutation_rate)
 void creature_train(Creature *creature)
 {
 
-    genann **population = init_population(creature);
-    genann **population_b_gen = init_population(creature);
+    genann *population = init_population(creature);
+    genann *population_b_gen = init_population(creature);
     double *fitnesses = malloc(sizeof fitnesses[0] * POP_SIZE);
     double max_fit = -INFINITY;
 
@@ -155,7 +157,7 @@ void creature_train(Creature *creature)
         TraceLog(LOG_INFO, "training %d generation", generation);
         for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
         {
-            creature->brain = population[pop_i];
+            creature->brain = population + pop_i;
             fitnesses[pop_i] = evaluate(creature);
             if (max_fit < fitnesses[pop_i])
             {
@@ -168,11 +170,11 @@ void creature_train(Creature *creature)
             genann *ind_a = select(population, fitnesses);
             genann *ind_b = select(population, fitnesses);
 
-            crossover(ind_a, ind_b, population_b_gen[pop_i]);
-            mutation(population_b_gen[pop_i], MUTATION_RATE);
+            crossover(ind_a, ind_b, population_b_gen + pop_i);
+            mutation(population_b_gen + pop_i, MUTATION_RATE);
         }
 
-        genann **temp;
+        genann *temp;
         temp = population;
         population = population_b_gen;
         population_b_gen = temp;
@@ -183,7 +185,7 @@ void creature_train(Creature *creature)
     size_t max_index = 0;
     for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
     {
-        creature->brain = population[pop_i];
+        creature->brain = population + pop_i;
         fitnesses[pop_i] = evaluate(creature);
         if (fitnesses[pop_i] > max_fit)
         {
@@ -191,7 +193,7 @@ void creature_train(Creature *creature)
             max_index = pop_i;
         }
     }
-    creature->brain = genann_copy(population[max_index]);
+    creature->brain = genann_copy(population + max_index);
     creature_reset(creature);
     free_population(population);
     free_population(population_b_gen);
