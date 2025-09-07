@@ -23,7 +23,8 @@ void physics_init_world()
     b2WorldDef worldDef = b2DefaultWorldDef();
     worldDef.gravity = (b2Vec2){0.0f, -10.0f};
     world_id = b2CreateWorld(&worldDef);
-    assert(b2World_IsValid(world_id));
+    b2World_EnableSleeping(world_id, false);
+
     physics_make_ground();
 }
 

@@ -4,17 +4,19 @@
 
 #define BUILD_FOLDER "build/"
 #define SRC_FOLDER "src/"
+#define EXTERNAL_FOLDER SRC_FOLDER "external/"
 #define OUTPUT_FILE BUILD_FOLDER "main"
 
 #if defined(_MSC_VER)
 #define nob_cc_flags(cmd) nob_cmd_append(cmd, "/W4", "/Zi", "/nologo", "/D_CRT_SECURE_NO_WARNINGS")
-#define nob_cc_include(cmd, target) cmd_append(cmd, "/I./raylib/" target "-build/include", "/I./box2d/" target "-build/include")
+#define nob_cc_include(cmd, target) cmd_append(cmd, "/I./" EXTERNAL_FOLDER "genann", "/I./raylib/" target "-build/include", "/I./box2d/" target "-build/include")
 #define nob_linker(cmd, target) cmd_append(cmd, "/LIBPATH:./raylib/" target "-build/lib", "raylib.lib", "/LIBPATH:./box2d/" target "-build/lib", "box2d.lib")
 #else
-#define nob_cc_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Wno-override-init-side-effects", "-D_POSIX_SOURCE", "-ggdb");
+#define nob_cc_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Wno-override-init-side-effects", "-D_POSIX_SOURCE");
 #define nob_cc_include(cmd, target)                                           \
     do                                                                        \
     {                                                                         \
+        cmd_append(cmd, "-I./" EXTERNAL_FOLDER "genann");                     \
         cmd_append(cmd, temp_sprintf("-I./raylib/%s-build/include", target)); \
         cmd_append(cmd, temp_sprintf("-I./box2d/%s-build/include", target));  \
     } while (0)
@@ -54,6 +56,8 @@ int main(int argc, char **argv)
     bool *help = flag_bool("help", false, "Print this help to stdout and exit with 0");
     bool *run = flag_bool("run", false, "Run main after compilation");
     bool *move_window = flag_bool("move_window", false, "Make the game window appear in the top-right corner of the screen. This is helpful for development.");
+    bool *debug = flag_bool("debug", false, "Compile with debug symbols");
+    bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     char **target = flag_str("target", DEFAULT_TARGET, "Compilation target (windows/linux)");
 
     if (!flag_parse(argc, argv))
@@ -75,7 +79,9 @@ int main(int argc, char **argv)
     nob_log(INFO, "==================================");
     nob_log(INFO, "Compilation target: %s", *target);
     nob_log(INFO, "Flags:");
-    nob_log(INFO, "\t\tmove_window: %s", FLAG_SET(*move_window));
+    nob_log(INFO, "\t\tmove_window:\t%s", FLAG_SET(*move_window));
+    nob_log(INFO, "\t\tdebug:\t\t%s", FLAG_SET(*debug));
+    nob_log(INFO, "\t\toptimize:\t\t%s", FLAG_SET(*optimize));
     nob_log(INFO, "==================================");
 
     Cmd cmd = {0};
@@ -126,12 +132,18 @@ int main(int argc, char **argv)
         nob_cc_flags(&cmd);
         if (*move_window)
             cmd_append(&cmd, "-DMOVE_WINDOW");
+        if (*debug)
+            cmd_append(&cmd, "-ggdb", "-Og");
+        else if (*optimize)
+            cmd_append(&cmd, "-Ofast");
         nob_cc_include(&cmd, *target);
         nob_cc_output(&cmd, OUTPUT_FILE);
         nob_cc_inputs(&cmd,
                       SRC_FOLDER "main.c",
                       SRC_FOLDER "physics.c",
-                      SRC_FOLDER "creature.c", );
+                      SRC_FOLDER "creature.c",
+                      SRC_FOLDER "trainer.c",
+                      EXTERNAL_FOLDER "genann/genann.c", );
         nob_linker(&cmd, *target);
 
         if (!cmd_run(&cmd))

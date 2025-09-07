@@ -1,9 +1,11 @@
+#include <stdlib.h>
 #include <stdio.h>
 
 #include "raylib.h"
 #include "assert.h"
 #include "physics.h"
 #include "creature.h"
+#include "trainer.h"
 
 int main(void)
 {
@@ -13,6 +15,7 @@ int main(void)
     const int screenWidth = 1200;
     const int screenHeight = 600;
 
+    srand(123456789);
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "empty game, full potential");
@@ -41,6 +44,8 @@ int main(void)
     //                     CREATURE INITIALIZATION
     // #==============================================================
     Creature creature = creature_make();
+    creature_train(&creature);
+
     // #==============================================================
     //                           GAME LOOP
     // #==============================================================
