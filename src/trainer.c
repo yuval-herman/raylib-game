@@ -6,7 +6,7 @@
 
 typedef struct Individual
 {
-    const genann *brain;
+    genann *brain;
     float fitness;
 } Individual;
 
@@ -44,6 +44,7 @@ genann *init_population(Creature *creature)
         ((genann *)population)[i].weight = (double *)(weights_start + weights_size * i);
         ((genann *)population)[i].output = ((genann *)population)[i].weight + ((genann *)population)[i].total_weights;
         ((genann *)population)[i].delta = ((genann *)population)[i].output + ((genann *)population)[i].total_neurons;
+
         genann_randomize(((genann *)population) + i);
     }
 
@@ -154,8 +155,8 @@ static void copy_weights(const genann *src, genann *dst)
 
 double crossover_abort_chance(int generation)
 {
-    const double target_rate = 0.2;
-    const double min_rate = 0.01;
+    const double target_rate = 0.05;
+    const double min_rate = 0.001;
     return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
 }
 
@@ -175,6 +176,14 @@ void creature_train(Creature *creature)
 
     double crss_abort_chance;
 
+    Individual elitists[ELITIST_AMOUNT];
+    for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+    {
+        elitists[elt_i].brain = genann_copy(best_brain);
+    }
+
+    size_t elitist_i = 0;
+
     float alltime_max_fit = -INFINITY;
     float max_fit = -INFINITY, min_fit = INFINITY, avg_fit = 0, fit;
     for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
@@ -189,6 +198,9 @@ void creature_train(Creature *creature)
             max_fit = fit;
         if (alltime_max_fit < fit)
         {
+            elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
+            copy_weights(population + pop_i, elitists[elitist_i].brain);
+            elitists[elitist_i].fitness = fit;
             alltime_max_fit = fit;
             copy_weights(creature->brain, best_brain);
         }
@@ -208,7 +220,13 @@ void creature_train(Creature *creature)
         max_fit = -INFINITY;
         min_fit = INFINITY;
         avg_fit = 0;
-        for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
+
+        for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+        {
+            copy_weights(elitists[elt_i].brain, population_b_gen + elt_i);
+            fitnesses[elt_i] = elitists[elt_i].fitness;
+        }
+        for (size_t pop_i = ELITIST_AMOUNT; pop_i < POP_SIZE; pop_i++)
         {
             Individual ind_a = select(population, fitnesses);
             Individual ind_b = select(population, fitnesses);
@@ -245,6 +263,9 @@ void creature_train(Creature *creature)
                 max_fit = fit;
             if (alltime_max_fit < fit)
             {
+                elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
+                copy_weights(population + pop_i, elitists[elitist_i].brain);
+                elitists[elitist_i].fitness = fit;
                 alltime_max_fit = fit;
                 copy_weights(creature->brain, best_brain);
             }
@@ -279,6 +300,10 @@ void creature_train(Creature *creature)
     // Re-enable warm starting
     b2World_EnableWarmStarting(world_id, true);
 #endif
+    for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+    {
+        genann_free(elitists[elt_i].brain);
+    }
     creature_reset(creature);
     free_population(population);
     free_population(population_b_gen);
