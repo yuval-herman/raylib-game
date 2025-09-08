@@ -82,6 +82,9 @@ void genann_randomize(genann *ann);
 /* Returns a new copy of ann. */
 genann *genann_copy(genann const *ann);
 
+/* Copies src snn to dst ann. */
+void genann_no_alloc_copy(genann const *src, genann *dst);
+
 /* Frees the memory used by an ann. */
 void genann_free(genann *ann);
 

@@ -192,6 +192,25 @@ genann *genann_copy(genann const *ann) {
 }
 
 
+void genann_no_alloc_copy(genann const *src, genann *dst) {
+    const int src_size = sizeof(genann) + sizeof(double) * (src->total_weights + src->total_neurons + (src->total_neurons - src->inputs));
+    assert(src->total_weights == dst->total_weights);
+    assert(src->total_neurons == dst->total_neurons);
+    assert(src->inputs        == dst->inputs);
+    assert(src->hidden_layers == dst->hidden_layers);
+    assert(src->hidden        == dst->hidden);
+    assert(src->outputs       == dst->outputs);
+    
+
+    memcpy(dst, src, src_size);
+
+    /* Set pointers. */
+    dst->weight = (double*)((char*)dst + sizeof(genann));
+    dst->output = dst->weight + dst->total_weights;
+    dst->delta = dst->output + dst->total_neurons;
+}
+
+
 void genann_randomize(genann *ann) {
     int i;
     for (i = 0; i < ann->total_weights; ++i) {
