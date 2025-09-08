@@ -172,7 +172,7 @@ void creature_reset(Creature *creature)
 
 void creature_draw(Creature creature)
 {
-// TODO:
+    // TODO:
     // This is inefficient, I am checking bodies positions twice.
     // The reason is that I want joints to be drawn beneath nodes.
     // It could possibly be done more efficiently, but let's leave a TODO here in hopes of getting back to this,
@@ -183,14 +183,14 @@ void creature_draw(Creature creature)
         Vector2 body_b_pos = b2rVec(b2Body_GetPosition(b2Joint_GetBodyB(creature.joint_ids[joint_i])));
         DrawLineEx(body_a_pos, body_b_pos, 1, BLACK);
     }
-Vector2 center = {0};
+    Vector2 center = {0};
     float top = INFINITY;
     for (unsigned int body_i = 0; body_i < creature.node_amount; body_i++)
     {
         // Get body position and shape
         b2BodyId node_id = creature.node_ids[body_i];
         Vector2 pos = b2rVec(b2Body_GetPosition(node_id));
-center.x += pos.x;
+        center.x += pos.x;
         if (pos.y < top)
             top = pos.y;
         b2ShapeId shape_id;
@@ -200,7 +200,7 @@ center.x += pos.x;
         // Draw the node after the joints so it appears on top
         DrawCircleV(pos, circle.radius, RED);
     }
-const Font font = GetFontDefault();
+    const Font font = GetFontDefault();
     const char *text = TextFormat("%.2f,%.2f", center.x, center.y);
     const float font_size = 3;
     const float font_spacing = 1;

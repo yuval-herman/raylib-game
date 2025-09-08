@@ -1,13 +1,20 @@
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "trainer.h"
+
+typedef struct Individual
+{
+    const genann *brain;
+    float fitness;
+} Individual;
 
 // Get average node position
 b2Vec2 get_avg_position(Creature *creature)
 {
     b2Vec2 avg = {0};
-    for (unsigned int body_i = 0; body_i < creature->node_amount; body_i++)
+    for (size_t body_i = 0; body_i < creature->node_amount; body_i++)
     {
         b2Vec2 pos = b2Body_GetPosition(creature->node_ids[body_i]);
         avg.x += pos.x;
@@ -17,13 +24,6 @@ b2Vec2 get_avg_position(Creature *creature)
     avg.y /= creature->node_amount;
     return avg;
 }
-
-// Train creature using genetic algorithm
-
-// Initialization
-// Selection
-// Crossover
-// Mutation
 
 genann *init_population(Creature *creature)
 {
@@ -57,33 +57,36 @@ void free_population(genann *population)
     free(population);
 }
 
-double evaluate(Creature *creature)
+float evaluate(Creature *creature)
 {
     // TODO: I'm ignoring UP for now since it's a bit complicated
     CreatureInstruction inst_arr[] = {INST_NONE, INST_LEFT, INST_RIGHT};
 
-    double fitness = 0;
+    float fitness = 0;
     CreatureInstruction inst;
 
     creature_reset(creature);
     for (int test = 0; test < EVALUATION_TESTS; test++)
     {
+#ifdef DETERMINISTIC_TRAINING
+        inst = inst_arr[test % ARRAY_COUNT(inst_arr)];
+#else
         inst = inst_arr[GetRandomValue(0, ARRAY_COUNT(inst_arr) - 1)];
+#endif
         b2Vec2 start_pos = get_avg_position(creature);
-        double last_pos = start_pos.x;
+        float last_pos = start_pos.x;
         for (int i = 0; i < EVALUATION_STEPS; i++)
         {
             creature_think(creature, inst);
             b2World_Step(world_id, TIME_STEP, SUB_STEP_COUNT);
             b2Vec2 pos = get_avg_position(creature);
 
-            // TODO: actually check if the creature is grounded
-            if (inst != INST_NONE && (fabs(last_pos - pos.x) < FLT_EPSILON || pos.y < 1.1))
+            if (inst != INST_NONE && (fabsf(last_pos - pos.x) < FLT_EPSILON))
                 break;
             last_pos = pos.x;
         }
 
-        double distance = fabs(last_pos - start_pos.x);
+        float distance = fabsf(last_pos - start_pos.x);
         if (inst == INST_NONE)
         {
             fitness -= distance * 2;
@@ -96,18 +99,12 @@ double evaluate(Creature *creature)
                 fitness += distance;
             else
                 fitness /= 2;
-
-            // TraceLog(LOG_INFO, "Test %d: Inst=%d, Distance=%.2f, Moved%s, Should%s, Fitness=%.2f",
-            //          test, inst, distance,
-            //          moved_right ? "Right" : "Left",
-            //          should_move_right ? "Right" : "Left",
-            //          test_fitness);
         }
     }
     return fitness;
 }
 
-genann *select(genann *population, double *fitnesses)
+Individual select(genann *population, float *fitnesses)
 {
     size_t index_max = GetRandomValue(0, POP_SIZE - 1);
     for (int i = 0; i < TOURNAMENT_SIZE; i++)
@@ -116,63 +113,130 @@ genann *select(genann *population, double *fitnesses)
         if (fitnesses[index_max] < fitnesses[index_check])
             index_max = index_check;
     }
-
-    return population + index_max;
+    return (Individual){.brain = population + index_max, .fitness = fitnesses[index_max]};
 }
 
-void crossover(const genann *ind_a, const genann *ind_b, genann *child)
+void crossover(const Individual stronger, const Individual weaker, genann *child)
 {
-    assert(ind_a->total_weights == ind_b->total_weights);
-
-    for (int i = 0; i < ind_a->total_weights; ++i)
+    assert(stronger.fitness >= weaker.fitness);
+    assert(stronger.brain->total_weights == weaker.brain->total_weights);
+    for (int i = 0; i < stronger.brain->total_weights; ++i)
     {
-        child->weight[i] = GENANN_RANDOM() < 0.5 ? ind_a->weight[i] : ind_b->weight[i];
+        child->weight[i] = GENANN_RANDOM() < CROSSOVER_BIAS ? stronger.brain->weight[i] : weaker.brain->weight[i];
     }
 }
 
-void mutation(genann *ind, double mutation_rate)
+void mutation(genann *ind)
 {
     for (int i = 0; i < ind->total_weights; ++i)
     {
-        if (GENANN_RANDOM() < mutation_rate)
+        if (GENANN_RANDOM() < MUTATION_RATE)
         {
-            ind->weight[i] += (GENANN_RANDOM() - 0.5) * MUTATION_AMOUNT;
+            ind->weight[i] += (GENANN_RANDOM() - 0.5) * MAX_MUTATION_AMOUNT;
             ind->weight[i] = b2ClampFloat(ind->weight[i], -0.5, 0.5);
         }
     }
 }
 
+// Copy weights from src to dst safely (works when src may have separately allocated weight buffer)
+static void copy_weights(const genann *src, genann *dst)
+{
+    assert(src->total_weights == dst->total_weights);
+    assert(src->total_neurons == dst->total_neurons);
+    assert(src->inputs == dst->inputs);
+    assert(src->hidden_layers == dst->hidden_layers);
+    assert(src->hidden == dst->hidden);
+    assert(src->outputs == dst->outputs);
+
+    // Copy only the weight buffer. Outputs and deltas are scratch and don't need persistent copy.
+    memcpy(dst->weight, src->weight, sizeof(double) * src->total_weights);
+}
+
 void creature_train(Creature *creature)
 {
-
+#ifdef DETERMINISTIC_TRAINING
+    /* Disable warm starting while training so the solver does not reuse cached impulse
+     * accumulators from previous simulations. This reduces cross-evaluation
+     * nondeterminism when we reset body transforms between runs. */
+    b2World_EnableWarmStarting(world_id, false);
+#endif
     genann *population = init_population(creature);
     genann *population_b_gen = init_population(creature);
-    double *fitnesses = malloc(sizeof fitnesses[0] * POP_SIZE);
-    double max_fit = -INFINITY;
+    float *fitnesses = malloc(sizeof fitnesses[0] * POP_SIZE);
 
-    genann_free(creature->brain);
+    genann *best_brain = creature->brain;
+
+    float alltime_max_fit = -INFINITY;
+    float max_fit = -INFINITY, min_fit = INFINITY, avg_fit = 0, fit;
+    for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
+    {
+        creature->brain = population + pop_i;
+        fit = evaluate(creature);
+        fitnesses[pop_i] = fit;
+
+        if (min_fit > fit)
+            min_fit = fit;
+        if (max_fit < fit)
+            max_fit = fit;
+        if (alltime_max_fit < fit)
+        {
+            alltime_max_fit = fit;
+            copy_weights(creature->brain, best_brain);
+        }
+        avg_fit += fit;
+    }
+    avg_fit /= POP_SIZE;
 
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
-        TraceLog(LOG_INFO, "training %d generation", generation);
+        TraceLog(LOG_INFO, "%d generation, fitness: [max: %+.3f, avg: %+.3f, min: %+.3f]", generation, max_fit, avg_fit, min_fit);
+        max_fit = -INFINITY;
+        min_fit = INFINITY;
+        avg_fit = 0;
         for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
         {
-            creature->brain = population + pop_i;
-            fitnesses[pop_i] = evaluate(creature);
-            if (max_fit < fitnesses[pop_i])
-            {
-                max_fit = fitnesses[pop_i];
-                TraceLog(LOG_INFO, "gen %d, max fit increased %g", generation, max_fit);
-            }
-        }
-        for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
-        {
-            genann *ind_a = select(population, fitnesses);
-            genann *ind_b = select(population, fitnesses);
+            Individual ind_a = select(population, fitnesses);
+            Individual ind_b = select(population, fitnesses);
 
-            crossover(ind_a, ind_b, population_b_gen + pop_i);
-            mutation(population_b_gen + pop_i, MUTATION_RATE);
+            Individual *stronger;
+            Individual *weaker;
+            if (ind_a.fitness > ind_b.fitness)
+            {
+                stronger = &ind_a;
+                weaker = &ind_b;
+            }
+            else
+            {
+                stronger = &ind_b;
+                weaker = &ind_a;
+            }
+
+            crossover(*stronger, *weaker, population_b_gen + pop_i);
+            mutation(population_b_gen + pop_i);
+            creature->brain = population_b_gen + pop_i;
+            float child_fit = evaluate(creature);
+            if (child_fit < stronger->fitness && GENANN_RANDOM() < CROSSOVER_ABORT_RATE)
+            {
+                copy_weights(stronger->brain, population_b_gen + pop_i);
+                fit = stronger->fitness;
+            }
+            else
+            {
+                fit = child_fit;
+            }
+            if (min_fit > fit)
+                min_fit = fit;
+            if (max_fit < fit)
+                max_fit = fit;
+            if (alltime_max_fit < fit)
+            {
+                alltime_max_fit = fit;
+                copy_weights(creature->brain, best_brain);
+            }
+            avg_fit += fit;
+            fitnesses[pop_i] = fit;
         }
+        avg_fit /= POP_SIZE;
 
         genann *temp;
         temp = population;
@@ -180,20 +244,26 @@ void creature_train(Creature *creature)
         population_b_gen = temp;
     };
 
-    // Set the brain to the best brain
-    max_fit = DBL_MIN;
     size_t max_index = 0;
     for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
     {
         creature->brain = population + pop_i;
         fitnesses[pop_i] = evaluate(creature);
-        if (fitnesses[pop_i] > max_fit)
+        if (fitnesses[pop_i] > alltime_max_fit)
         {
-            max_fit = fitnesses[pop_i];
+            alltime_max_fit = fitnesses[pop_i];
             max_index = pop_i;
         }
     }
-    creature->brain = genann_copy(population + max_index);
+
+    copy_weights(population + max_index, best_brain);
+    creature->brain = best_brain;
+
+    TraceLog(LOG_INFO, "set brain to %g fitness", alltime_max_fit);
+#ifdef DETERMINISTIC_TRAINING
+    // Re-enable warm starting
+    b2World_EnableWarmStarting(world_id, true);
+#endif
     creature_reset(creature);
     free_population(population);
     free_population(population_b_gen);
