@@ -135,7 +135,7 @@ int main(int argc, char **argv)
         if (*debug)
             cmd_append(&cmd, "-ggdb", "-Og");
         else if (*optimize)
-            cmd_append(&cmd, "-Ofast", "-march=native");
+            cmd_append(&cmd, "-O3", "-march=native");
         nob_cc_include(&cmd, *target);
         nob_cc_output(&cmd, OUTPUT_FILE);
         nob_cc_inputs(&cmd,
