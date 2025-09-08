@@ -79,7 +79,7 @@ float evaluate(Creature *creature)
         for (int i = 0; i < EVALUATION_STEPS; i++)
         {
             creature_think(creature, inst);
-            b2World_Step(world_id, TIME_STEP, SUB_STEP_COUNT);
+            b2World_Step(creature->world_id, TIME_STEP, SUB_STEP_COUNT);
             b2Vec2 pos = get_avg_position(creature);
 
             if (inst != INST_NONE && (fabsf(last_pos - pos.x) < FLT_EPSILON))
@@ -155,8 +155,8 @@ static void copy_weights(const genann *src, genann *dst)
 
 double crossover_abort_chance(int generation)
 {
-    const double target_rate = 0.05;
-    const double min_rate = 0.001;
+    const double target_rate = CROSSOVER_ABORT_MAX;
+    const double min_rate = CROSSOVER_ABORT_MIN;
     return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
 }
 
@@ -211,7 +211,7 @@ void creature_train(Creature *creature)
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
         crss_abort_chance = crossover_abort_chance(generation);
-        TraceLog(LOG_INFO, "%d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f], crossover_abort_chance: [%.3f]",
+        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f], crossover_abort_chance: [%.3f]",
                  generation,
                  max_fit,
                  avg_fit,

@@ -14,7 +14,9 @@ int main(void)
     // #==============================================================
     //                       BOX2D INITIALIZATION
     // #==============================================================
-    physics_init_world();
+    b2WorldId world_id = physics_make_world();
+    physics_make_ground(world_id);
+
     Rectangle groundBoxRect = {.width = GROUND_EXTENT * 2, .height = 20};
     Vector2 groundBoxRectOrigin = getRectOrigin(groundBoxRect);
 
@@ -30,7 +32,7 @@ int main(void)
         {3, 2, 0},
         {3, 0, 0},
     };
-    Creature creature = creature_make(node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
+    Creature creature = creature_make(world_id, node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
     creature_train(&creature);
     // return 0;
 

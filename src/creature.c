@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "creature.h"
 #include "raymath.h"
@@ -46,7 +47,7 @@ void get_node_velocities(Creature *creature, double *node_velocities)
     }
 }
 
-b2BodyId make_node(b2Vec2 pos, float radius)
+b2BodyId make_node(b2WorldId world_id, b2Vec2 pos, float radius)
 {
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_dynamicBody;
@@ -65,7 +66,7 @@ b2BodyId make_node(b2Vec2 pos, float radius)
     return body_id;
 }
 
-b2JointId connect_nodes(b2BodyId node1, b2BodyId node2, JointData *joint_data)
+b2JointId connect_nodes(b2WorldId world_id, b2BodyId node1, b2BodyId node2, JointData *joint_data)
 {
     b2DistanceJointDef joint_def = b2DefaultDistanceJointDef();
 
@@ -88,13 +89,15 @@ b2JointId connect_nodes(b2BodyId node1, b2BodyId node2, JointData *joint_data)
     return b2CreateDistanceJoint(world_id, &joint_def);
 }
 
-Creature creature_make(b2Vec2 *node_positions, unsigned int node_amount, JointData *joints, unsigned int joint_amount)
+Creature creature_make(b2WorldId world_id, b2Vec2 *node_positions, unsigned int node_amount, JointData *joints, unsigned int joint_amount)
 {
+    b2Vec2 *owned_node_positions = malloc(sizeof node_positions[0] * node_amount);
+    memcpy(owned_node_positions, node_positions, sizeof node_positions[0] * node_amount);
     // Nodes
     b2BodyId *node_ids = malloc(sizeof node_ids[0] * node_amount);
     for (size_t node_i = 0; node_i < node_amount; node_i++)
     {
-        node_ids[node_i] = make_node(node_positions[node_i], 0);
+        node_ids[node_i] = make_node(world_id, node_positions[node_i], 0);
     }
 
     // Joints
@@ -106,7 +109,7 @@ Creature creature_make(b2Vec2 *node_positions, unsigned int node_amount, JointDa
         if (joints_data[joint_i].rest_motor_speed == 0)
             joints_data[joint_i].rest_motor_speed = default_motor_speed;
 
-        joint_ids[joint_i] = connect_nodes(node_ids[joints[joint_i].node_a_idx],
+        joint_ids[joint_i] = connect_nodes(world_id, node_ids[joints[joint_i].node_a_idx],
                                            node_ids[joints[joint_i].node_b_idx], joints_data + joint_i);
     }
 
@@ -121,7 +124,7 @@ Creature creature_make(b2Vec2 *node_positions, unsigned int node_amount, JointDa
     int inputs = node_amount * 4 + 2 + 3;
     double *brain_inputs = malloc(sizeof(double) * inputs);
     int hidden_layers = 2;
-    int hidden_nodes = inputs * 2;
+    int hidden_nodes = inputs;
     int outputs = joint_amount;
     genann *ann = genann_init(inputs,
                               hidden_layers,
@@ -131,20 +134,29 @@ Creature creature_make(b2Vec2 *node_positions, unsigned int node_amount, JointDa
     return (Creature){
         .node_amount = node_amount,
         .node_ids = node_ids,
-        .original_node_positions = node_positions,
+        .original_node_positions = owned_node_positions,
 
         .joint_amount = joint_amount,
         .joint_ids = joint_ids,
         .joints_data = joints_data,
 
+        .world_id = world_id,
+
         .brain = ann,
         .brain_inputs = brain_inputs,
     };
 }
-// void creature_destroy()
-// {
-//     // TODO
-// }
+
+// This DOES NOT destroy box2d bodies and shapes
+void creature_destroy(Creature *creature)
+{
+    genann_free(creature->brain);
+    free(creature->brain_inputs);
+    free(creature->joint_ids);
+    free(creature->joints_data);
+    free(creature->original_node_positions);
+    free(creature->node_ids);
+}
 
 void creature_reset_motors(Creature *creature)
 {

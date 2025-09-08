@@ -11,10 +11,8 @@
 
 #define ARRAY_COUNT(A) (int)(sizeof(A) / sizeof(A[0]))
 
-extern b2WorldId world_id;
-extern b2BodyId ground_id;
-
-void physics_init_world();
+b2WorldId physics_make_world();
+b2BodyId physics_make_ground(b2WorldId world_id);
 
 #define getRectOrigin(rect) \
     (Vector2){rect.width / 2, 0}

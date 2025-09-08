@@ -16,12 +16,12 @@ lead to faster stalling.
 You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but again reduce diversity.
 */
 
-#define POP_SIZE 50
-#define EVOLUTION_GENERATIONS 50
+#define POP_SIZE 70
+#define EVOLUTION_GENERATIONS 100
 
-#define EVALUATION_TESTS (8)
+#define EVALUATION_TESTS (10)
 #define EVALUATION_STEPS (60 * 20)
-#define EVALUATION_PENALTY (0.5f)
+#define EVALUATION_PENALTY (0.35f)
 
 #define ELITIST_AMOUNT 5
 static_assert(ELITIST_AMOUNT >= 0 && ELITIST_AMOUNT < POP_SIZE);
@@ -29,6 +29,9 @@ static_assert(ELITIST_AMOUNT >= 0 && ELITIST_AMOUNT < POP_SIZE);
 #define TOURNAMENT_SIZE (POP_SIZE / 10)
 #define CROSSOVER_BIAS 0.5 // How biased should crossover be towards the stronger parent
 static_assert(CROSSOVER_BIAS >= 0 && CROSSOVER_BIAS <= 1);
+
+#define CROSSOVER_ABORT_MAX 0.5
+#define CROSSOVER_ABORT_MIN 0
 
 #define MUTATION_RATE 0.05      // How many weights will change from the whole
 #define MAX_MUTATION_AMOUNT 0.1 // How much each weight will be able to change
