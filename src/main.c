@@ -32,6 +32,7 @@ int main(void)
     };
     Creature creature = creature_make(node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
     creature_train(&creature);
+    // return 0;
 
     // #==============================================================
     //                       RAYLIB INITIALIZATION

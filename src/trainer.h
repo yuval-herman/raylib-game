@@ -17,19 +17,21 @@ You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but ag
 */
 
 #define POP_SIZE 100
-#define EVOLUTION_GENERATIONS 50
+#define EVOLUTION_GENERATIONS 30
 
-#define EVALUATION_STEPS (60 * 10)
-#define EVALUATION_TESTS (6)
+#define EVALUATION_TESTS (8)
+#define EVALUATION_STEPS (60 * 30)
+#define EVALUATION_PENALTY (0.5f)
 
-#define TOURNAMENT_SIZE (POP_SIZE / 20)
+#define TOURNAMENT_SIZE (POP_SIZE / 10)
 #define CROSSOVER_BIAS 0.5 // How biased should crossover be towards the stronger parent
 static_assert(CROSSOVER_BIAS >= 0 && CROSSOVER_BIAS <= 1);
-#define CROSSOVER_ABORT_RATE 0.2 // The chances for picking a parent instead of a child if the child turned out worse then the parent
 
-#define MUTATION_RATE 0.02            // How many weights will change from the whole
-#define MAX_MUTATION_AMOUNT 0.0000001 // How much each weight will be able to change
+#define MUTATION_RATE 0.05      // How many weights will change from the whole
+#define MAX_MUTATION_AMOUNT 0.1 // How much each weight will be able to change
 static_assert(MAX_MUTATION_AMOUNT <= 1);
+
+// #define DETERMINISTIC_TRAINING
 
 void creature_train(Creature *creature);
 

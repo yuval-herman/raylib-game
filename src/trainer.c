@@ -89,7 +89,7 @@ float evaluate(Creature *creature)
         float distance = fabsf(last_pos - start_pos.x);
         if (inst == INST_NONE)
         {
-            fitness -= distance * 2;
+            fitness -= distance * EVALUATION_PENALTY;
         }
         else
         {
@@ -98,7 +98,7 @@ float evaluate(Creature *creature)
             if (moved_right == should_move_right)
                 fitness += distance;
             else
-                fitness /= 2;
+                fitness -= distance * EVALUATION_PENALTY;
         }
     }
     return fitness;
@@ -152,6 +152,13 @@ static void copy_weights(const genann *src, genann *dst)
     memcpy(dst->weight, src->weight, sizeof(double) * src->total_weights);
 }
 
+double crossover_abort_chance(int generation)
+{
+    const double target_rate = 0.2;
+    const double min_rate = 0.01;
+    return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
+}
+
 void creature_train(Creature *creature)
 {
 #ifdef DETERMINISTIC_TRAINING
@@ -165,6 +172,8 @@ void creature_train(Creature *creature)
     float *fitnesses = malloc(sizeof fitnesses[0] * POP_SIZE);
 
     genann *best_brain = creature->brain;
+
+    double crss_abort_chance;
 
     float alltime_max_fit = -INFINITY;
     float max_fit = -INFINITY, min_fit = INFINITY, avg_fit = 0, fit;
@@ -189,7 +198,13 @@ void creature_train(Creature *creature)
 
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
-        TraceLog(LOG_INFO, "%d generation, fitness: [max: %+.3f, avg: %+.3f, min: %+.3f]", generation, max_fit, avg_fit, min_fit);
+        crss_abort_chance = crossover_abort_chance(generation);
+        TraceLog(LOG_INFO, "%d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f], crossover_abort_chance: [%.3f]",
+                 generation,
+                 max_fit,
+                 avg_fit,
+                 min_fit,
+                 crss_abort_chance);
         max_fit = -INFINITY;
         min_fit = INFINITY;
         avg_fit = 0;
@@ -215,7 +230,7 @@ void creature_train(Creature *creature)
             mutation(population_b_gen + pop_i);
             creature->brain = population_b_gen + pop_i;
             float child_fit = evaluate(creature);
-            if (child_fit < stronger->fitness && GENANN_RANDOM() < CROSSOVER_ABORT_RATE)
+            if (child_fit < stronger->fitness && GENANN_RANDOM() < crss_abort_chance)
             {
                 copy_weights(stronger->brain, population_b_gen + pop_i);
                 fit = stronger->fitness;

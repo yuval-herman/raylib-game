@@ -250,6 +250,6 @@ void creature_update(Creature *creature)
     }
     else if (IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_LEFT))
     {
-        creature_reset_motors(creature);
+        creature_think(creature, INST_NONE);
     }
 }
