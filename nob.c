@@ -1,6 +1,7 @@
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
 #define NOB_EXPERIMENTAL_DELETE_OLD
+#define NOB_WARN_DEPRECATED
 
 #define BUILD_FOLDER "build/"
 #define SRC_FOLDER "src/"
@@ -58,6 +59,7 @@ int main(int argc, char **argv)
     bool *move_window = flag_bool("move_window", false, "Make the game window appear in the top-right corner of the screen. This is helpful for development.");
     bool *debug = flag_bool("debug", false, "Compile with debug symbols");
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
+    bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
     char **target = flag_str("target", DEFAULT_TARGET, "Compilation target (windows/linux)");
 
     if (!flag_parse(argc, argv))
@@ -79,9 +81,10 @@ int main(int argc, char **argv)
     nob_log(INFO, "==================================");
     nob_log(INFO, "Compilation target: %s", *target);
     nob_log(INFO, "Flags:");
-    nob_log(INFO, "\t\tmove_window:\t%s", FLAG_SET(*move_window));
-    nob_log(INFO, "\t\tdebug:\t\t%s", FLAG_SET(*debug));
-    nob_log(INFO, "\t\toptimize:\t\t%s", FLAG_SET(*optimize));
+    nob_log(INFO, "\t\t%-15s:\t%5s", "move_window", FLAG_SET(*move_window));
+    nob_log(INFO, "\t\t%-15s:\t%5s", "debug", FLAG_SET(*debug));
+    nob_log(INFO, "\t\t%-15s:\t%5s", "optimize", FLAG_SET(*optimize));
+    nob_log(INFO, "\t\t%-15s:\t%5s", "force", FLAG_SET(*force));
     nob_log(INFO, "==================================");
 
     Cmd cmd = {0};
@@ -89,22 +92,27 @@ int main(int argc, char **argv)
     File_Paths no_path_files = {0};
     File_Paths src_files = {0};
     String_Builder src_sb = {0};
-    bool read_dir_success = read_entire_dir(SRC_FOLDER, &no_path_files);
-    if (read_dir_success)
+    bool read_dir_success;
+
+    if (!*force)
     {
-        for (size_t i = 0; i < no_path_files.count; i++)
+        read_dir_success = read_entire_dir(SRC_FOLDER, &no_path_files);
+        if (read_dir_success)
         {
-            src_sb.count = 0;
-            sb_append_cstr(&src_sb, SRC_FOLDER);
-            sb_append_cstr(&src_sb, "/");
-            sb_append_cstr(&src_sb, no_path_files.items[i]);
-            sb_append_null(&src_sb);
-            da_append(&src_files, temp_strdup(src_sb.items));
+            for (size_t i = 0; i < no_path_files.count; i++)
+            {
+                src_sb.count = 0;
+                sb_append_cstr(&src_sb, SRC_FOLDER);
+                sb_append_cstr(&src_sb, "/");
+                sb_append_cstr(&src_sb, no_path_files.items[i]);
+                sb_append_null(&src_sb);
+                da_append(&src_files, temp_strdup(src_sb.items));
+            }
         }
     }
 
     // TODO detect flag changes, such as move_window, as also requiring a rebuild
-    if (!readdir || nob_needs_rebuild(OUTPUT_FILE, src_files.items, src_files.count))
+    if (!readdir || *force || nob_needs_rebuild(OUTPUT_FILE, src_files.items, src_files.count))
     {
         if (strcmp(*target, "windows") == 0)
         {
