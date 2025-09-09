@@ -33,8 +33,12 @@ int main(void)
         {3, 0, 0},
     };
     Creature creature = creature_make(rng, world_id, node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
-    creature_train(&creature);
-    // return 0;
+    if (creature_train(&creature) != 0)
+    {
+        TraceLog(LOG_ERROR, "error while training");
+        return 1;
+    }
+    return 0;
 
     // #==============================================================
     //                       RAYLIB INITIALIZATION

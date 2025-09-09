@@ -1,3 +1,10 @@
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+#include <threads.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -9,6 +16,65 @@ typedef struct Individual
     genann *brain;
     float fitness;
 } Individual;
+
+typedef struct TrainingStats
+{
+    float alltime_max_fit, max_fit, min_fit, avg_fit;
+} TrainingStats;
+
+// Here we store all mutexes, condition, and other crap needed to sync between threads.
+// This struct should be initialized once and passed by pointer.
+typedef struct ThreadsSync
+{
+    int thread_amount;
+    mtx_t shared_mtx;
+    cnd_t cond_workers;
+    cnd_t cond_main;
+    int finished_count;
+    int epoch;
+    bool quit;
+} ThreadsSync;
+
+// This is passed to threads
+typedef struct ThreadData
+{
+    Creature creature;
+    genann *population;
+    float *fitnesses;
+    size_t start_index;
+    size_t end_index;
+
+    // Thread synchronization shenanigans
+    int thread_amount;
+    mtx_t *shared_mtx;
+    cnd_t *cond_workers;
+    cnd_t *cond_main;
+    int *finished_count;
+    int *epoch; // current epoch number (generation)
+    bool *quit; // exit flag set by main
+} ThreadData;
+
+TrainingStats make_training_stats()
+{
+    return (TrainingStats){
+        .alltime_max_fit = -INFINITY,
+        .max_fit = -INFINITY,
+        .min_fit = INFINITY,
+        .avg_fit = 0,
+    };
+}
+
+// Number of CPU cores on the machine
+int n_cores(void)
+{
+#ifdef _WIN32
+    SYSTEM_INFO siSysInfo;
+    GetSystemInfo(&siSysInfo);
+    return siSysInfo.dwNumberOfProcessors;
+#else
+    return sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+}
 
 // Get average node position
 b2Vec2 get_avg_position(Creature *creature)
@@ -160,74 +226,235 @@ double crossover_abort_chance(int generation)
     return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
 }
 
-void creature_train(Creature *creature)
+int thread_job(void *arg)
 {
-#ifdef DETERMINISTIC_TRAINING
-    /* Disable warm starting while training so the solver does not reuse cached impulse
-     * accumulators from previous simulations. This reduces cross-evaluation
-     * nondeterminism when we reset body transforms between runs. */
-    b2World_EnableWarmStarting(world_id, false);
-#endif
+    RandomState *rng = random_make_seed();
+    ThreadData *data = arg;
+    genann *old_brain = data->creature.brain;
+    int local_epoch;
+
+    while (true)
+    {
+        mtx_lock(data->shared_mtx);
+        local_epoch = *data->epoch;
+        mtx_unlock(data->shared_mtx);
+
+        // Actual work, the rest is trying to keep threads from tearing each other apart...
+        for (size_t pop_i = data->start_index; pop_i < data->end_index; pop_i++)
+        {
+            data->creature.brain = data->population + pop_i;
+            data->fitnesses[pop_i] = evaluate(rng, &data->creature);
+        }
+
+        // Notify main we finished this epoch
+        mtx_lock(data->shared_mtx);
+        (*data->finished_count)++;
+
+        if (*data->finished_count == data->thread_amount)
+        {
+            // last worker wakes main
+            cnd_signal(data->cond_main);
+        }
+
+        // Wait until main advances the epoch (or sets quit)
+        while (*data->epoch == local_epoch && !*data->quit)
+        {
+            // This unlock `shared_mtx` while waiting, and re-locks it when done
+            cnd_wait(data->cond_workers, data->shared_mtx);
+        }
+
+        int should_quit = *data->quit;
+        mtx_unlock(data->shared_mtx);
+
+        if (should_quit)
+            break;
+    }
+
+    data->creature.brain = old_brain;
+    return thrd_success;
+}
+
+ThreadData *make_threads_data(RandomState *rng,
+                              genann *population,
+                              float *fitnesses,
+                              const Creature *creature,
+                              ThreadsSync *thread_sync)
+{
+    ThreadData *thread_data = malloc(sizeof thread_data[0] * thread_sync->thread_amount);
+    const int chunk_size = POP_SIZE / thread_sync->thread_amount;
+    for (int i = 0; i < thread_sync->thread_amount; i++)
+    {
+        int start = i * chunk_size;
+        int end = (i == thread_sync->thread_amount - 1) ? POP_SIZE : start + chunk_size;
+
+        thread_data[i].start_index = start;
+        thread_data[i].end_index = end;
+        thread_data[i].fitnesses = fitnesses;
+        thread_data[i].population = population;
+        b2WorldId private_world_id = physics_make_world();
+        thread_data[i].creature = creature_make(rng, private_world_id, creature->original_node_positions, creature->node_amount, creature->joints_data, creature->joint_amount);
+
+        thread_data[i].thread_amount = thread_sync->thread_amount;
+        thread_data[i].shared_mtx = &thread_sync->shared_mtx;
+        thread_data[i].cond_workers = &thread_sync->cond_workers;
+        thread_data[i].cond_main = &thread_sync->cond_main;
+        thread_data[i].finished_count = &thread_sync->finished_count;
+        thread_data[i].epoch = &thread_sync->epoch; // current epoch number (generation)
+        thread_data[i].quit = &thread_sync->quit;   // exit flag set by main
+    }
+    return thread_data;
+}
+void destroy_threads(thrd_t *threads, ThreadData *thread_data, ThreadsSync *thread_sync)
+{
+    // Tell workers to quit and wake them
+    mtx_lock(&thread_sync->shared_mtx);
+    thread_sync->quit = 1;
+    cnd_broadcast(&thread_sync->cond_workers);
+    mtx_unlock(&thread_sync->shared_mtx);
+
+    // Join threads
+    for (int i = 0; i < thread_sync->thread_amount; ++i)
+    {
+        thrd_join(threads[i], NULL);
+    }
+
+    for (int i = 0; i < thread_sync->thread_amount; i++)
+    {
+        b2DestroyWorld(thread_data[i].creature.world_id);
+        creature_destroy(&thread_data[i].creature);
+    }
+
+    free(thread_data);
+    free(threads);
+    mtx_destroy(&thread_sync->shared_mtx);
+    cnd_destroy(&thread_sync->cond_workers);
+    cnd_destroy(&thread_sync->cond_main);
+}
+
+int evaluate_threads(ThreadData *thread_data, thrd_t *threads, ThreadsSync *thread_sync)
+{
+    for (int i = 0; i < thread_sync->thread_amount; i++)
+    {
+        if (thrd_create(&threads[i], thread_job, thread_data + i) != thrd_success)
+        {
+            TraceLog(LOG_ERROR, "Error creating thread %d.\n", i);
+            return 1;
+        }
+    }
+
+    // Wait for all workers to finish this epoch
+    mtx_lock(&thread_sync->shared_mtx);
+    while (thread_sync->finished_count < thread_sync->thread_amount)
+    {
+        cnd_wait(&thread_sync->cond_main, &thread_sync->shared_mtx);
+    }
+
+    // All workers finished epoch 'e'
+    thread_sync->finished_count = 0;           // reset for next epoch
+    thread_sync->epoch++;                      // advance epoch
+    cnd_broadcast(&thread_sync->cond_workers); // wake all workers to start next epoch
+    mtx_unlock(&thread_sync->shared_mtx);
+
+    return 0;
+}
+
+void update_training_stats(TrainingStats *stats, float *fitnesses, genann *best_brain, const genann *population)
+{
+    for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
+    {
+        // creature->brain = population + pop_i;
+        // fit = evaluate(rng, creature);
+        float fit = fitnesses[pop_i];
+
+        if (stats->min_fit > fit)
+            stats->min_fit = fit;
+        if (stats->max_fit < fit)
+            stats->max_fit = fit;
+        if (stats->alltime_max_fit < fit)
+        {
+            // elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
+            // copy_weights(population + pop_i, elitists[elitist_i].brain);
+            // elitists[elitist_i].fitness = fit;
+            stats->alltime_max_fit = fit;
+            copy_weights(population + pop_i, best_brain);
+        }
+        stats->avg_fit += fit;
+    }
+    stats->avg_fit /= POP_SIZE;
+}
+
+int creature_train(Creature *creature)
+{
+    // #ifdef DETERMINISTIC_TRAINING
+    //     /* Disable warm starting while training so the solver does not reuse cached impulse
+    //      * accumulators from previous simulations. This reduces cross-evaluation
+    //      * nondeterminism when we reset body transforms between runs. */
+    //     b2World_EnableWarmStarting(creature->world_id, false);
+    //     RandomState *rng = random_make();
+    //     random_seed(rng, 52u, 36u);
+    // #else
+    // RandomState *rng = random_make_seed();
+    // #endif
+
     RandomState *rng = random_make_seed();
     genann *population = init_population(rng, creature);
     genann *population_b_gen = init_population(rng, creature);
     float *fitnesses = malloc(sizeof fitnesses[0] * POP_SIZE);
+    TrainingStats stats = make_training_stats();
 
     genann *best_brain = creature->brain;
-
     double crss_abort_chance;
 
-    Individual elitists[ELITIST_AMOUNT];
-    for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
-    {
-        elitists[elt_i].brain = genann_copy(best_brain);
-    }
+    const int cores = n_cores();
+    assert(cores > 0);
 
-    size_t elitist_i = 0;
+    // These are passed by pointer to individual threads for synchronization
 
-    float alltime_max_fit = -INFINITY;
-    float max_fit = -INFINITY, min_fit = INFINITY, avg_fit = 0, fit;
-    for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
-    {
-        creature->brain = population + pop_i;
-        fit = evaluate(rng, creature);
-        fitnesses[pop_i] = fit;
+    ThreadsSync thread_sync = {
+        .finished_count = 0,
+        .epoch = 0,
+        .quit = false,
+    };
+    mtx_init(&thread_sync.shared_mtx, mtx_plain);
+    cnd_init(&thread_sync.cond_workers);
+    cnd_init(&thread_sync.cond_main);
 
-        if (min_fit > fit)
-            min_fit = fit;
-        if (max_fit < fit)
-            max_fit = fit;
-        if (alltime_max_fit < fit)
-        {
-            elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
-            copy_weights(population + pop_i, elitists[elitist_i].brain);
-            elitists[elitist_i].fitness = fit;
-            alltime_max_fit = fit;
-            copy_weights(creature->brain, best_brain);
-        }
-        avg_fit += fit;
-    }
-    avg_fit /= POP_SIZE;
+    thrd_t *threads = malloc(sizeof threads[0] * cores);
+    ThreadData *thread_data = make_threads_data(rng, population, fitnesses, creature, &thread_sync);
+
+    if (evaluate_threads(thread_data, threads, &thread_sync) != 0)
+        return 1;
+
+    // Individual elitists[ELITIST_AMOUNT];
+    // for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+    // {
+    //     elitists[elt_i].brain = genann_copy(best_brain);
+    // }
+
+    // size_t elitist_i = 0;
+
+    update_training_stats(&stats, fitnesses, best_brain, population);
 
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
         crss_abort_chance = crossover_abort_chance(generation);
         TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f], crossover_abort_chance: [%.3f]",
                  generation,
-                 max_fit,
-                 avg_fit,
-                 min_fit,
+                 stats.max_fit,
+                 stats.avg_fit,
+                 stats.min_fit,
                  crss_abort_chance);
-        max_fit = -INFINITY;
-        min_fit = INFINITY;
-        avg_fit = 0;
+        stats.max_fit = -INFINITY;
+        stats.min_fit = INFINITY;
+        stats.avg_fit = 0;
 
-        for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
-        {
-            copy_weights(elitists[elt_i].brain, population_b_gen + elt_i);
-            fitnesses[elt_i] = elitists[elt_i].fitness;
-        }
-        for (size_t pop_i = ELITIST_AMOUNT; pop_i < POP_SIZE; pop_i++)
+        // for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+        // {
+        //     copy_weights(elitists[elt_i].brain, population_b_gen + elt_i);
+        //     fitnesses[elt_i] = elitists[elt_i].fitness;
+        // }
+        // for (size_t pop_i = ELITIST_AMOUNT; pop_i < POP_SIZE; pop_i++)
+        for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
         {
             Individual ind_a = select(rng, population, fitnesses);
             Individual ind_b = select(rng, population, fitnesses);
@@ -247,66 +474,74 @@ void creature_train(Creature *creature)
 
             crossover(rng, *stronger, *weaker, population_b_gen + pop_i);
             mutation(rng, population_b_gen + pop_i);
-            creature->brain = population_b_gen + pop_i;
-            float child_fit = evaluate(rng, creature);
-            if (child_fit < stronger->fitness && random_double(rng) < crss_abort_chance)
+            // creature->brain = population_b_gen + pop_i;
+            // float child_fit = evaluate(rng, creature);
+            // if (child_fit < stronger->fitness && random_double(rng) < crss_abort_chance)
+            // {
+            //     copy_weights(stronger->brain, population_b_gen + pop_i);
+            //     fit = stronger->fitness;
+            // }
+            // else
+            // {
+            //     fit = child_fit;
+            // }
+            // if (min_fit > fit)
+            //     min_fit = fit;
+            // if (max_fit < fit)
+            //     max_fit = fit;
+            // if (alltime_max_fit < fit)
             {
-                copy_weights(stronger->brain, population_b_gen + pop_i);
-                fit = stronger->fitness;
+                // elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
+                // copy_weights(population + pop_i, elitists[elitist_i].brain);
+                // elitists[elitist_i].fitness = fit;
+                //     alltime_max_fit = fit;
+                //     copy_weights(creature->brain, best_brain);
+                // }
+                // avg_fit += fit;
+                // fitnesses[pop_i] = fit;
             }
-            else
-            {
-                fit = child_fit;
-            }
-            if (min_fit > fit)
-                min_fit = fit;
-            if (max_fit < fit)
-                max_fit = fit;
-            if (alltime_max_fit < fit)
-            {
-                elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
-                copy_weights(population + pop_i, elitists[elitist_i].brain);
-                elitists[elitist_i].fitness = fit;
-                alltime_max_fit = fit;
-                copy_weights(creature->brain, best_brain);
-            }
-            avg_fit += fit;
-            fitnesses[pop_i] = fit;
+            // avg_fit /= POP_SIZE;
         }
-        avg_fit /= POP_SIZE;
+        if (evaluate_threads(thread_data, threads, &thread_sync) != 0)
+            return 1;
+        update_training_stats(&stats, fitnesses, best_brain, population);
 
         genann *temp;
         temp = population;
         population = population_b_gen;
         population_b_gen = temp;
-    };
 
-    size_t max_index = 0;
-    for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
-    {
-        creature->brain = population + pop_i;
-        fitnesses[pop_i] = evaluate(rng, creature);
-        if (fitnesses[pop_i] > alltime_max_fit)
-        {
-            alltime_max_fit = fitnesses[pop_i];
-            max_index = pop_i;
-        }
+        // size_t max_index = 0;
+        // for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
+        // {
+        //     creature->brain = population + pop_i;
+        //     fitnesses[pop_i] = evaluate(rng, creature);
+        //     if (fitnesses[pop_i] > alltime_max_fit)
+        //     {
+        //         alltime_max_fit = fitnesses[pop_i];
+        //         max_index = pop_i;
+        //     }
+        // }
+
+        // copy_weights(population + max_index, best_brain);
+        // creature->brain = best_brain;
+
+        TraceLog(LOG_INFO, "set brain to %g fitness", stats.alltime_max_fit);
+        // #ifdef DETERMINISTIC_TRAINING
+        //     // Re-enable warm starting
+        //     b2World_EnableWarmStarting(creature->world_id, true);
+        // #endif
+        // for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+        // {
+        //     genann_free(elitists[elt_i].brain);
+        // }
+        creature_reset(creature);
     }
 
-    copy_weights(population + max_index, best_brain);
-    creature->brain = best_brain;
-
-    TraceLog(LOG_INFO, "set brain to %g fitness", alltime_max_fit);
-#ifdef DETERMINISTIC_TRAINING
-    // Re-enable warm starting
-    b2World_EnableWarmStarting(world_id, true);
-#endif
-    for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
-    {
-        genann_free(elitists[elt_i].brain);
-    }
-    creature_reset(creature);
     free_population(population);
     free_population(population_b_gen);
     random_destroy(rng);
+
+    destroy_threads(threads, thread_data, &thread_sync);
+    return 0;
 }

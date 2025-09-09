@@ -16,8 +16,8 @@ lead to faster stalling.
 You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but again reduce diversity.
 */
 
-#define POP_SIZE 70
-#define EVOLUTION_GENERATIONS 100
+#define POP_SIZE 180
+#define EVOLUTION_GENERATIONS 10
 
 #define EVALUATION_TESTS (10)
 #define EVALUATION_STEPS (60 * 20)
@@ -39,6 +39,6 @@ static_assert(MAX_MUTATION_AMOUNT <= 1);
 
 // #define DETERMINISTIC_TRAINING
 
-void creature_train(Creature *creature);
+int creature_train(Creature *creature);
 
 #endif // TRAINER_HEADER
