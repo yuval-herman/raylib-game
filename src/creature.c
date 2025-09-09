@@ -89,7 +89,7 @@ b2JointId connect_nodes(b2WorldId world_id, b2BodyId node1, b2BodyId node2, Join
     return b2CreateDistanceJoint(world_id, &joint_def);
 }
 
-Creature creature_make(b2WorldId world_id, b2Vec2 *node_positions, unsigned int node_amount, JointData *joints, unsigned int joint_amount)
+Creature creature_make(RandomState *rng, b2WorldId world_id, b2Vec2 *node_positions, unsigned int node_amount, JointData *joints, unsigned int joint_amount)
 {
     b2Vec2 *owned_node_positions = malloc(sizeof node_positions[0] * node_amount);
     memcpy(owned_node_positions, node_positions, sizeof node_positions[0] * node_amount);
@@ -126,7 +126,7 @@ Creature creature_make(b2WorldId world_id, b2Vec2 *node_positions, unsigned int 
     int hidden_layers = 2;
     int hidden_nodes = inputs;
     int outputs = joint_amount;
-    genann *ann = genann_init(inputs,
+    genann *ann = genann_init(rng, inputs,
                               hidden_layers,
                               hidden_nodes,
                               outputs);

@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 
 #include "raylib.h"
 #include "assert.h"
@@ -10,7 +9,8 @@
 
 int main(void)
 {
-    srand(time(0));
+    RandomState *rng = random_make_seed();
+
     // #==============================================================
     //                       BOX2D INITIALIZATION
     // #==============================================================
@@ -32,7 +32,7 @@ int main(void)
         {3, 2, 0},
         {3, 0, 0},
     };
-    Creature creature = creature_make(world_id, node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
+    Creature creature = creature_make(rng, world_id, node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
     creature_train(&creature);
     // return 0;
 

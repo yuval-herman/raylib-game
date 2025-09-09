@@ -14,18 +14,21 @@
 #define nob_linker(cmd, target) cmd_append(cmd, "/LIBPATH:./raylib/" target "-build/lib", "raylib.lib", "/LIBPATH:./box2d/" target "-build/lib", "box2d.lib")
 #else
 #define nob_cc_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Wno-override-init-side-effects", "-D_POSIX_SOURCE");
-#define nob_cc_include(cmd, target)                                           \
-    do                                                                        \
-    {                                                                         \
-        cmd_append(cmd, "-I./" EXTERNAL_FOLDER "genann");                     \
-        cmd_append(cmd, temp_sprintf("-I./raylib/%s-build/include", target)); \
-        cmd_append(cmd, temp_sprintf("-I./box2d/%s-build/include", target));  \
+#define nob_cc_include(cmd, target)                                               \
+    do                                                                            \
+    {                                                                             \
+        cmd_append(cmd, "-I./" SRC_FOLDER);                                       \
+        cmd_append(cmd, "-I./" EXTERNAL_FOLDER "genann");                         \
+        cmd_append(cmd, temp_sprintf("-I./raylib/%s-build/include", target));     \
+        cmd_append(cmd, temp_sprintf("-I./box2d/%s-build/include", target));      \
+        cmd_append(cmd, temp_sprintf("-I./pcg_random/%s-build/include", target)); \
     } while (0)
-#define nob_linker(cmd, target)                                                            \
-    do                                                                                     \
-    {                                                                                      \
-        cmd_append(cmd, temp_sprintf("-L./raylib/%s-build/lib", target), "-lraylib");      \
-        cmd_append(cmd, temp_sprintf("-L./box2d/%s-build/lib", target), "-lbox2d", "-lm"); \
+#define nob_linker(cmd, target)                                                               \
+    do                                                                                        \
+    {                                                                                         \
+        cmd_append(cmd, temp_sprintf("-L./raylib/%s-build/lib", target), "-lraylib");         \
+        cmd_append(cmd, temp_sprintf("-L./box2d/%s-build/lib", target), "-lbox2d", "-lm");    \
+        cmd_append(cmd, temp_sprintf("-L./pcg_random/%s-build/lib", target), "-lpcg_random"); \
     } while (0)
 #endif
 
@@ -151,6 +154,7 @@ int main(int argc, char **argv)
                       SRC_FOLDER "physics.c",
                       SRC_FOLDER "creature.c",
                       SRC_FOLDER "trainer.c",
+                      SRC_FOLDER "random.c",
                       EXTERNAL_FOLDER "genann/genann.c", );
         nob_linker(&cmd, *target);
 

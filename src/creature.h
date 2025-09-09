@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "physics.h"
+#include "random.h"
 #include "genann.h"
 
 // TODO: should assert on these in code
@@ -42,7 +43,7 @@ typedef enum CreatureInstruction
     INST_UP,
 } CreatureInstruction;
 
-Creature creature_make(b2WorldId world_id,
+Creature creature_make(RandomState *rng, b2WorldId world_id,
                        b2Vec2 *node_positions,
                        unsigned int node_amount,
                        JointData *joints,
