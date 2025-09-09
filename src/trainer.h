@@ -16,12 +16,16 @@ lead to faster stalling.
 You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but again reduce diversity.
 */
 
-#define POP_SIZE 180
-#define EVOLUTION_GENERATIONS 10
+// Numbers divisible by 18 (my laptop cores ¯\(ツ)/¯)
+// 18, 36, 54, 72, 90, 108, 126, 144, 162, 180, 198
 
-#define EVALUATION_TESTS (10)
+#define POP_SIZE 90
+#define EVOLUTION_GENERATIONS 100
+
+#define EVALUATION_TESTS (1)
 #define EVALUATION_STEPS (60 * 20)
-#define EVALUATION_PENALTY (0.35f)
+#define EVALUATION_PENALTY (0.3f)                // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
+#define EVALUATION_EARLY_TERMINATION_PENALTY (1) // Points to deduce
 
 #define ELITIST_AMOUNT 5
 static_assert(ELITIST_AMOUNT >= 0 && ELITIST_AMOUNT < POP_SIZE);

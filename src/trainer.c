@@ -130,6 +130,7 @@ float evaluate(RandomState *rng, Creature *creature)
     CreatureInstruction inst_arr[] = {INST_NONE, INST_LEFT, INST_RIGHT};
 
     float fitness = 0;
+    bool early_termination = false;
     CreatureInstruction inst;
 
     creature_reset(creature);
@@ -148,9 +149,16 @@ float evaluate(RandomState *rng, Creature *creature)
             b2World_Step(creature->world_id, TIME_STEP, SUB_STEP_COUNT);
             b2Vec2 pos = get_avg_position(creature);
 
-            if (inst != INST_NONE && (fabsf(last_pos - pos.x) < FLT_EPSILON))
+            early_termination = inst != INST_NONE && (fabsf(last_pos - pos.x) < FLT_EPSILON);
+            if (early_termination)
                 break;
             last_pos = pos.x;
+        }
+
+        if (early_termination)
+        {
+            fitness -= EVALUATION_EARLY_TERMINATION_PENALTY;
+            break;
         }
 
         float distance = fabsf(last_pos - start_pos.x);
@@ -233,11 +241,14 @@ int thread_job(void *arg)
     genann *old_brain = data->creature.brain;
     int local_epoch;
 
+    TraceLog(LOG_DEBUG, "worker %zu thread started", data->start_index);
+
     while (true)
     {
         mtx_lock(data->shared_mtx);
         local_epoch = *data->epoch;
         mtx_unlock(data->shared_mtx);
+        TraceLog(LOG_DEBUG, "worker %zu thread evaluating population for epoch %d", data->start_index, local_epoch);
 
         // Actual work, the rest is trying to keep threads from tearing each other apart...
         for (size_t pop_i = data->start_index; pop_i < data->end_index; pop_i++)
@@ -271,6 +282,8 @@ int thread_job(void *arg)
     }
 
     data->creature.brain = old_brain;
+    TraceLog(LOG_DEBUG, "worker %zu thread exiting", data->start_index);
+    random_destroy(rng);
     return thrd_success;
 }
 
@@ -306,16 +319,20 @@ ThreadData *make_threads_data(RandomState *rng,
 }
 void destroy_threads(thrd_t *threads, ThreadData *thread_data, ThreadsSync *thread_sync)
 {
+    TraceLog(LOG_DEBUG, "Trying to destroy threads. Wish me luck.");
     // Tell workers to quit and wake them
     mtx_lock(&thread_sync->shared_mtx);
     thread_sync->quit = 1;
     cnd_broadcast(&thread_sync->cond_workers);
     mtx_unlock(&thread_sync->shared_mtx);
+    TraceLog(LOG_DEBUG, "Told em to stop. Now we wait...");
 
     // Join threads
     for (int i = 0; i < thread_sync->thread_amount; ++i)
     {
+        TraceLog(LOG_DEBUG, "joining worker %d", i);
         thrd_join(threads[i], NULL);
+        TraceLog(LOG_DEBUG, "joined worker %d", i);
     }
 
     for (int i = 0; i < thread_sync->thread_amount; i++)
@@ -331,30 +348,43 @@ void destroy_threads(thrd_t *threads, ThreadData *thread_data, ThreadsSync *thre
     cnd_destroy(&thread_sync->cond_main);
 }
 
-int evaluate_threads(ThreadData *thread_data, thrd_t *threads, ThreadsSync *thread_sync)
+// This is critical code that has to be inside a mutex lock!
+void wait_all_threads(ThreadsSync *thread_sync)
 {
-    for (int i = 0; i < thread_sync->thread_amount; i++)
-    {
-        if (thrd_create(&threads[i], thread_job, thread_data + i) != thrd_success)
-        {
-            TraceLog(LOG_ERROR, "Error creating thread %d.\n", i);
-            return 1;
-        }
-    }
-
-    // Wait for all workers to finish this epoch
-    mtx_lock(&thread_sync->shared_mtx);
     while (thread_sync->finished_count < thread_sync->thread_amount)
     {
         cnd_wait(&thread_sync->cond_main, &thread_sync->shared_mtx);
     }
 
-    // All workers finished epoch 'e'
-    thread_sync->finished_count = 0;           // reset for next epoch
-    thread_sync->epoch++;                      // advance epoch
-    cnd_broadcast(&thread_sync->cond_workers); // wake all workers to start next epoch
-    mtx_unlock(&thread_sync->shared_mtx);
+    thread_sync->finished_count = 0; // reset for next epoch
+    thread_sync->epoch++;            // advance epoch
+}
 
+int evaluate_threads(ThreadData *thread_data, thrd_t *threads, ThreadsSync *thread_sync)
+{
+    /* Create worker threads once. They will loop and wait on condition variable
+    between epochs. */
+    if (thread_sync->epoch == 0)
+    {
+        for (int i = 0; i < thread_sync->thread_amount; i++)
+        {
+            if (thrd_create(&threads[i], thread_job, thread_data + i) != thrd_success)
+            {
+                TraceLog(LOG_ERROR, "Error creating thread %d.\n", i);
+                return 1;
+            }
+        }
+        mtx_lock(&thread_sync->shared_mtx);
+        wait_all_threads(thread_sync);
+        mtx_unlock(&thread_sync->shared_mtx);
+    }
+    else
+    {
+        mtx_lock(&thread_sync->shared_mtx);
+        cnd_broadcast(&thread_sync->cond_workers); // wake all workers to start next epoch
+        wait_all_threads(thread_sync);
+        mtx_unlock(&thread_sync->shared_mtx);
+    }
     return 0;
 }
 
@@ -376,6 +406,7 @@ void update_training_stats(TrainingStats *stats, float *fitnesses, genann *best_
             // copy_weights(population + pop_i, elitists[elitist_i].brain);
             // elitists[elitist_i].fitness = fit;
             stats->alltime_max_fit = fit;
+            TraceLog(LOG_DEBUG, "set brain to %g fitness", fit);
             copy_weights(population + pop_i, best_brain);
         }
         stats->avg_fit += fit;
@@ -401,16 +432,14 @@ int creature_train(Creature *creature)
     genann *population_b_gen = init_population(rng, creature);
     float *fitnesses = malloc(sizeof fitnesses[0] * POP_SIZE);
     TrainingStats stats = make_training_stats();
-
-    genann *best_brain = creature->brain;
     double crss_abort_chance;
 
     const int cores = n_cores();
     assert(cores > 0);
 
     // These are passed by pointer to individual threads for synchronization
-
     ThreadsSync thread_sync = {
+        .thread_amount = cores,
         .finished_count = 0,
         .epoch = 0,
         .quit = false,
@@ -433,7 +462,7 @@ int creature_train(Creature *creature)
 
     // size_t elitist_i = 0;
 
-    update_training_stats(&stats, fitnesses, best_brain, population);
+    update_training_stats(&stats, fitnesses, creature->brain, population);
 
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
@@ -490,26 +519,27 @@ int creature_train(Creature *creature)
             // if (max_fit < fit)
             //     max_fit = fit;
             // if (alltime_max_fit < fit)
-            {
-                // elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
-                // copy_weights(population + pop_i, elitists[elitist_i].brain);
-                // elitists[elitist_i].fitness = fit;
-                //     alltime_max_fit = fit;
-                //     copy_weights(creature->brain, best_brain);
-                // }
-                // avg_fit += fit;
-                // fitnesses[pop_i] = fit;
-            }
+            // {
+            // elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
+            // copy_weights(population + pop_i, elitists[elitist_i].brain);
+            // elitists[elitist_i].fitness = fit;
+            //     alltime_max_fit = fit;
+            //     copy_weights(creature->brain, best_brain);
+            // }
+            // avg_fit += fit;
+            // fitnesses[pop_i] = fit;
+            // }
             // avg_fit /= POP_SIZE;
         }
-        if (evaluate_threads(thread_data, threads, &thread_sync) != 0)
-            return 1;
-        update_training_stats(&stats, fitnesses, best_brain, population);
 
         genann *temp;
         temp = population;
         population = population_b_gen;
         population_b_gen = temp;
+
+        if (evaluate_threads(thread_data, threads, &thread_sync) != 0)
+            return 1;
+        update_training_stats(&stats, fitnesses, creature->brain, population);
 
         // size_t max_index = 0;
         // for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
@@ -526,7 +556,6 @@ int creature_train(Creature *creature)
         // copy_weights(population + max_index, best_brain);
         // creature->brain = best_brain;
 
-        TraceLog(LOG_INFO, "set brain to %g fitness", stats.alltime_max_fit);
         // #ifdef DETERMINISTIC_TRAINING
         //     // Re-enable warm starting
         //     b2World_EnableWarmStarting(creature->world_id, true);
@@ -535,13 +564,13 @@ int creature_train(Creature *creature)
         // {
         //     genann_free(elitists[elt_i].brain);
         // }
-        creature_reset(creature);
     }
+
+    TraceLog(LOG_DEBUG, "Freeing training resources");
 
     free_population(population);
     free_population(population_b_gen);
     random_destroy(rng);
-
     destroy_threads(threads, thread_data, &thread_sync);
     return 0;
 }

@@ -144,7 +144,7 @@ int main(int argc, char **argv)
         if (*move_window)
             cmd_append(&cmd, "-DMOVE_WINDOW");
         if (*debug)
-            cmd_append(&cmd, "-ggdb", "-Og");
+            cmd_append(&cmd, "-ggdb", "-O0");
         else if (*optimize)
             cmd_append(&cmd, "-O3", "-march=native");
         nob_cc_include(&cmd, *target);
