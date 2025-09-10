@@ -38,7 +38,7 @@ int main(void)
         TraceLog(LOG_ERROR, "error while training");
         return 1;
     }
-    return 0;
+    // return 0;
 
     // #==============================================================
     //                       RAYLIB INITIALIZATION

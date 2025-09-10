@@ -67,12 +67,16 @@ TrainingStats make_training_stats()
 // Number of CPU cores on the machine
 int n_cores(void)
 {
+#if defined(ENABLE_THREADS) && ENABLE_THREADS
 #ifdef _WIN32
     SYSTEM_INFO siSysInfo;
     GetSystemInfo(&siSysInfo);
     return siSysInfo.dwNumberOfProcessors;
 #else
     return sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+#else
+    return 1;
 #endif
 }
 
@@ -131,6 +135,7 @@ float evaluate(RandomState *rng, Creature *creature)
 
     float fitness = 0;
     bool early_termination = false;
+    int stagnation_steps = 0;
     CreatureInstruction inst;
 
     creature_reset(creature);
@@ -142,36 +147,56 @@ float evaluate(RandomState *rng, Creature *creature)
         inst = inst_arr[random_uint64_range(rng, 0, ARRAY_COUNT(inst_arr) - 1)];
 #endif
         b2Vec2 start_pos = get_avg_position(creature);
-        float last_pos = start_pos.x;
-        for (int i = 0; i < EVALUATION_STEPS; i++)
+        b2Vec2 last_pos = start_pos;
+
+        // I use a random amount of steps so the creature won't get used to fixed input
+        int steps = random_uint64_upto(rng, EVALUATION_STEPS);
+        for (int i = 0; i < steps; i++)
         {
             creature_think(creature, inst);
             b2World_Step(creature->world_id, TIME_STEP, SUB_STEP_COUNT);
             b2Vec2 pos = get_avg_position(creature);
 
-            early_termination = inst != INST_NONE && (fabsf(last_pos - pos.x) < FLT_EPSILON);
-            if (early_termination)
+            early_termination = inst != INST_NONE && (fabsf(last_pos.x - pos.x) < FLT_EPSILON);
+            if (early_termination && ++stagnation_steps == EVALUATION_EARLY_TERMINATION_STEPS)
                 break;
-            last_pos = pos.x;
+            else
+            {
+                early_termination = false;
+                stagnation_steps = 0;
+            }
+            last_pos = pos;
         }
 
+        // Reward for standing up
+        if (last_pos.y > creature->node_radius)
+        {
+            fitness += 5;
+        }
+
+        // Penalize for not moving
         if (early_termination)
         {
             fitness -= EVALUATION_EARLY_TERMINATION_PENALTY;
             break;
         }
 
-        float distance = fabsf(last_pos - start_pos.x);
+        float distance = fabsf(last_pos.x - start_pos.x);
+        // Penalize for moving while instructed to stop
         if (inst == INST_NONE)
         {
             fitness -= distance * EVALUATION_PENALTY;
         }
         else
         {
-            bool moved_right = last_pos > start_pos.x;
+            bool moved_right = last_pos.x > start_pos.x;
             bool should_move_right = inst == INST_RIGHT;
+            //  Reward for moving in the correct direction
             if (moved_right == should_move_right)
+            {
                 fitness += distance;
+            }
+            // Penalize for moving in the wrong direction
             else
                 fitness -= distance * EVALUATION_PENALTY;
         }
@@ -305,6 +330,8 @@ ThreadData *make_threads_data(RandomState *rng,
         thread_data[i].fitnesses = fitnesses;
         thread_data[i].population = population;
         b2WorldId private_world_id = physics_make_world();
+        // This will be destroyed when destroying the world so we don't bother storing its id
+        physics_make_ground(private_world_id);
         thread_data[i].creature = creature_make(rng, private_world_id, creature->original_node_positions, creature->node_amount, creature->joints_data, creature->joint_amount);
 
         thread_data[i].thread_amount = thread_sync->thread_amount;
@@ -406,7 +433,7 @@ void update_training_stats(TrainingStats *stats, float *fitnesses, genann *best_
             // copy_weights(population + pop_i, elitists[elitist_i].brain);
             // elitists[elitist_i].fitness = fit;
             stats->alltime_max_fit = fit;
-            TraceLog(LOG_DEBUG, "set brain to %g fitness", fit);
+            TraceLog(LOG_INFO, "set brain to %g fitness", fit);
             copy_weights(population + pop_i, best_brain);
         }
         stats->avg_fit += fit;
@@ -572,5 +599,6 @@ int creature_train(Creature *creature)
     free_population(population_b_gen);
     random_destroy(rng);
     destroy_threads(threads, thread_data, &thread_sync);
+
     return 0;
 }

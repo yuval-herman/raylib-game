@@ -29,6 +29,7 @@ typedef struct Creature
     b2BodyId *node_ids;
     unsigned int node_amount;
     b2Vec2 *original_node_positions;
+    float node_radius;
 
     b2JointId *joint_ids;
     JointData *joints_data;

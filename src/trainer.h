@@ -19,11 +19,14 @@ You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but ag
 // Numbers divisible by 18 (my laptop cores ¯\(ツ)/¯)
 // 18, 36, 54, 72, 90, 108, 126, 144, 162, 180, 198
 
-#define POP_SIZE 90
-#define EVOLUTION_GENERATIONS 100
+#define ENABLE_THREADS true
 
-#define EVALUATION_TESTS (1)
-#define EVALUATION_STEPS (60 * 20)
+#define POP_SIZE 144
+#define EVOLUTION_GENERATIONS 20
+
+#define EVALUATION_TESTS (4)
+#define EVALUATION_STEPS (60 * 15)
+#define EVALUATION_EARLY_TERMINATION_STEPS (60)  // After how many steps without movement to terminate
 #define EVALUATION_PENALTY (0.3f)                // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
 #define EVALUATION_EARLY_TERMINATION_PENALTY (1) // Points to deduce
 

@@ -49,6 +49,7 @@ void get_node_velocities(Creature *creature, double *node_velocities)
 
 b2BodyId make_node(b2WorldId world_id, b2Vec2 pos, float radius)
 {
+    assert(radius > 0);
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_dynamicBody;
     body_def.position = pos;
@@ -60,7 +61,7 @@ b2BodyId make_node(b2WorldId world_id, b2Vec2 pos, float radius)
     shape_def.material.friction = 1;
     shape_def.density = 1;
 
-    b2Circle circle = {.center = b2Vec2_zero, .radius = radius ? radius : default_node_radius};
+    b2Circle circle = {.center = b2Vec2_zero, .radius = radius};
     b2CreateCircleShape(body_id, &shape_def, &circle);
 
     return body_id;
@@ -76,6 +77,7 @@ b2JointId connect_nodes(b2WorldId world_id, b2BodyId node1, b2BodyId node2, Join
 
     b2Vec2 anchorA = b2Body_GetWorldPoint(node1, b2Vec2_zero);
     b2Vec2 anchorB = b2Body_GetWorldPoint(node2, b2Vec2_zero);
+    // TODO: should use actual radius, or just a more meaningful value
     joint_def.minLength = default_node_radius;
     joint_def.maxLength = b2Distance(anchorA, anchorB);
 
@@ -97,7 +99,7 @@ Creature creature_make(RandomState *rng, b2WorldId world_id, b2Vec2 *node_positi
     b2BodyId *node_ids = malloc(sizeof node_ids[0] * node_amount);
     for (size_t node_i = 0; node_i < node_amount; node_i++)
     {
-        node_ids[node_i] = make_node(world_id, node_positions[node_i], 0);
+        node_ids[node_i] = make_node(world_id, node_positions[node_i], default_node_radius);
     }
 
     // Joints
@@ -115,16 +117,20 @@ Creature creature_make(RandomState *rng, b2WorldId world_id, b2Vec2 *node_positi
 
     // Brain
     // Inputs:
-    // node positions [x, y]
-    // node velocities [x, y]
-    // center height
-    // instruction flags
+    int inputs =
+        // node positions [x, y]
+        node_amount * 2
+        // node velocities [x, y]
+        + node_amount * 2
+        // center height
+        + 1
+        // instruction flags
+        + 3;
     // Outputs:
     // motor speeds for joints
-    int inputs = node_amount * 4 + 2 + 3;
     double *brain_inputs = malloc(sizeof(double) * inputs);
-    int hidden_layers = 2;
-    int hidden_nodes = inputs;
+    int hidden_layers = 1;
+    int hidden_nodes = inputs * 2;
     int outputs = joint_amount;
     genann *ann = genann_init(rng, inputs,
                               hidden_layers,
@@ -135,6 +141,7 @@ Creature creature_make(RandomState *rng, b2WorldId world_id, b2Vec2 *node_positi
         .node_amount = node_amount,
         .node_ids = node_ids,
         .original_node_positions = owned_node_positions,
+        .node_radius = default_node_radius,
 
         .joint_amount = joint_amount,
         .joint_ids = joint_ids,
@@ -203,21 +210,21 @@ void creature_draw(Creature creature)
         b2BodyId node_id = creature.node_ids[body_i];
         Vector2 pos = b2rVec(b2Body_GetPosition(node_id));
         center.x += pos.x;
+        center.y += pos.y;
         if (pos.y < top)
             top = pos.y;
-        b2ShapeId shape_id;
-        b2Body_GetShapes(node_id, &shape_id, 1);
-        b2Circle circle = b2Shape_GetCircle(shape_id);
 
         // Draw the node after the joints so it appears on top
-        DrawCircleV(pos, circle.radius, RED);
+        DrawCircleV(pos, creature.node_radius, RED);
     }
     const Font font = GetFontDefault();
-    const char *text = TextFormat("%.2f,%.2f", center.x, center.y);
+    center.x /= creature.node_amount;
+    center.y /= creature.node_amount;
+    // reverse y because of previous b2rVec use
+    const char *text = TextFormat("%.2f,%.2f", center.x, -center.y);
     const float font_size = 3;
     const float font_spacing = 1;
     Vector2 text_measure = MeasureTextEx(font, text, font_size, font_spacing);
-    center.x /= creature.node_amount;
     center.x -= text_measure.x / 2;
     center.y = top - font_size - 1;
     DrawTextEx(font, text, center, font_size, font_spacing, BLACK);
@@ -231,12 +238,11 @@ void creature_think(Creature *creature, CreatureInstruction inst)
     inputs += creature->node_amount * 2;
     get_node_velocities(creature, inputs);
     inputs += creature->node_amount * 2;
-    inputs[0] = center.x;
-    inputs[1] = center.y;
+    inputs[0] = center.y;
 
-    inputs[2] = inst == INST_LEFT;
-    inputs[3] = inst == INST_RIGHT;
-    inputs[4] = inst == INST_NONE;
+    inputs[1] = inst == INST_LEFT;
+    inputs[2] = inst == INST_RIGHT;
+    inputs[3] = inst == INST_NONE;
 
     const double *motor_speeds = genann_run(creature->brain, creature->brain_inputs);
     for (size_t i = 0; i < creature->joint_amount; i++)
