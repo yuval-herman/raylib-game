@@ -21,19 +21,19 @@ You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but ag
 
 #define ENABLE_THREADS true
 
-#define POP_SIZE 144
+#define POP_SIZE 90
 #define EVOLUTION_GENERATIONS 20
 
 #define EVALUATION_TESTS (4)
 #define EVALUATION_STEPS (60 * 15)
 #define EVALUATION_EARLY_TERMINATION_STEPS (60)  // After how many steps without movement to terminate
-#define EVALUATION_PENALTY (0.3f)                // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
-#define EVALUATION_EARLY_TERMINATION_PENALTY (1) // Points to deduce
+#define EVALUATION_PENALTY (0.5f)                // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
+#define EVALUATION_EARLY_TERMINATION_PENALTY (2) // Points to deduce
 
-#define ELITIST_AMOUNT 5
+#define ELITIST_AMOUNT 20
 static_assert(ELITIST_AMOUNT >= 0 && ELITIST_AMOUNT < POP_SIZE);
 
-#define TOURNAMENT_SIZE (POP_SIZE / 10)
+#define TOURNAMENT_SIZE (POP_SIZE / 5)
 #define CROSSOVER_BIAS 0.5 // How biased should crossover be towards the stronger parent
 static_assert(CROSSOVER_BIAS >= 0 && CROSSOVER_BIAS <= 1);
 

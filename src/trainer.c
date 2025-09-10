@@ -17,9 +17,13 @@ typedef struct Individual
     float fitness;
 } Individual;
 
+#define TREND_WINDOW 10
+
 typedef struct TrainingStats
 {
-    float alltime_max_fit, max_fit, min_fit, avg_fit;
+    float alltime_max_fit, max_fit, min_fit, avg_fit, fit_trend;
+    float trend_window[TREND_WINDOW];
+    size_t trend_i;
 } TrainingStats;
 
 // Here we store all mutexes, condition, and other crap needed to sync between threads.
@@ -61,6 +65,9 @@ TrainingStats make_training_stats()
         .max_fit = -INFINITY,
         .min_fit = INFINITY,
         .avg_fit = 0,
+        .fit_trend = 0,
+        .trend_i = 0,
+        .trend_window = {0},
     };
 }
 
@@ -411,12 +418,15 @@ int evaluate_threads(ThreadData *thread_data, thrd_t *threads, ThreadsSync *thre
     return 0;
 }
 
-void update_training_stats(TrainingStats *stats, float *fitnesses, genann *best_brain, const genann *population)
+void update_training_stats(TrainingStats *stats,
+                           float *fitnesses,
+                           genann *best_brain,
+                           const genann *population,
+                           Individual *elitists,
+                           size_t *elitist_i)
 {
     for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
     {
-        // creature->brain = population + pop_i;
-        // fit = evaluate(rng, creature);
         float fit = fitnesses[pop_i];
 
         if (stats->min_fit > fit)
@@ -425,16 +435,29 @@ void update_training_stats(TrainingStats *stats, float *fitnesses, genann *best_
             stats->max_fit = fit;
         if (stats->alltime_max_fit < fit)
         {
-            // elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
-            // copy_weights(population + pop_i, elitists[elitist_i].brain);
-            // elitists[elitist_i].fitness = fit;
+            *elitist_i = (*elitist_i + 1) % ELITIST_AMOUNT;
+            copy_weights(population + pop_i, elitists[*elitist_i].brain);
             stats->alltime_max_fit = fit;
             TraceLog(LOG_INFO, "set brain to %g fitness", fit);
             copy_weights(population + pop_i, best_brain);
         }
         stats->avg_fit += fit;
     }
+
     stats->avg_fit /= POP_SIZE;
+    for (size_t i = 0; i < TREND_WINDOW - 1; i++)
+    {
+        stats->trend_window[i] = stats->trend_window[i + 1];
+    }
+
+    stats->trend_window[TREND_WINDOW - 1] = stats->avg_fit;
+    stats->fit_trend = 0;
+    for (size_t i = 0; i < TREND_WINDOW - 1; i++)
+    {
+        float diff = stats->trend_window[i + 1] - stats->trend_window[i];
+        stats->fit_trend += diff;
+    }
+    stats->fit_trend /= TREND_WINDOW;
 }
 
 int creature_train(Creature *creature)
@@ -463,39 +486,38 @@ int creature_train(Creature *creature)
     thrd_t *threads = malloc(sizeof threads[0] * cores);
     ThreadData *thread_data = make_threads_data(rng, population, fitnesses, creature, &thread_sync);
 
+    Individual elitists[ELITIST_AMOUNT];
+    for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+    {
+        elitists[elt_i].brain = genann_copy(creature->brain);
+    }
+
+    size_t elitist_i = 0;
+
     if (evaluate_threads(thread_data, threads, &thread_sync) != 0)
         return 1;
 
-    // Individual elitists[ELITIST_AMOUNT];
-    // for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
-    // {
-    //     elitists[elt_i].brain = genann_copy(best_brain);
-    // }
-
-    // size_t elitist_i = 0;
-
-    update_training_stats(&stats, fitnesses, creature->brain, population);
+    update_training_stats(&stats, fitnesses, creature->brain, population, elitists, &elitist_i);
 
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
         crss_abort_chance = crossover_abort_chance(generation);
-        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f], crossover_abort_chance: [%.3f]",
+        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f, trend: %+8.3f], crossover_abort_chance: [%.3f]",
                  generation,
                  stats.max_fit,
                  stats.avg_fit,
                  stats.min_fit,
+                 stats.fit_trend,
                  crss_abort_chance);
         stats.max_fit = -INFINITY;
         stats.min_fit = INFINITY;
         stats.avg_fit = 0;
 
-        // for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
-        // {
-        //     copy_weights(elitists[elt_i].brain, population_b_gen + elt_i);
-        //     fitnesses[elt_i] = elitists[elt_i].fitness;
-        // }
-        // for (size_t pop_i = ELITIST_AMOUNT; pop_i < POP_SIZE; pop_i++)
-        for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
+        for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+        {
+            copy_weights(elitists[elt_i].brain, population_b_gen + elt_i);
+        }
+        for (size_t pop_i = ELITIST_AMOUNT; pop_i < POP_SIZE; pop_i++)
         {
             Individual ind_a = select(rng, population, fitnesses);
             Individual ind_b = select(rng, population, fitnesses);
@@ -515,33 +537,6 @@ int creature_train(Creature *creature)
 
             crossover(rng, *stronger, *weaker, population_b_gen + pop_i);
             mutation(rng, population_b_gen + pop_i);
-            // creature->brain = population_b_gen + pop_i;
-            // float child_fit = evaluate(rng, creature);
-            // if (child_fit < stronger->fitness && random_double(rng) < crss_abort_chance)
-            // {
-            //     copy_weights(stronger->brain, population_b_gen + pop_i);
-            //     fit = stronger->fitness;
-            // }
-            // else
-            // {
-            //     fit = child_fit;
-            // }
-            // if (min_fit > fit)
-            //     min_fit = fit;
-            // if (max_fit < fit)
-            //     max_fit = fit;
-            // if (alltime_max_fit < fit)
-            // {
-            // elitist_i = (elitist_i + 1) % ELITIST_AMOUNT;
-            // copy_weights(population + pop_i, elitists[elitist_i].brain);
-            // elitists[elitist_i].fitness = fit;
-            //     alltime_max_fit = fit;
-            //     copy_weights(creature->brain, best_brain);
-            // }
-            // avg_fit += fit;
-            // fitnesses[pop_i] = fit;
-            // }
-            // avg_fit /= POP_SIZE;
         }
 
         genann *temp;
@@ -551,24 +546,10 @@ int creature_train(Creature *creature)
 
         if (evaluate_threads(thread_data, threads, &thread_sync) != 0)
             return 1;
-        update_training_stats(&stats, fitnesses, creature->brain, population);
-
-        // size_t max_index = 0;
-        // for (size_t pop_i = 0; pop_i < POP_SIZE; pop_i++)
-        // {
-        //     creature->brain = population + pop_i;
-        //     fitnesses[pop_i] = evaluate(rng, creature);
-        //     if (fitnesses[pop_i] > alltime_max_fit)
-        //     {
-        //         alltime_max_fit = fitnesses[pop_i];
-        //         max_index = pop_i;
-        //     }
-        // }
-
-        // copy_weights(population + max_index, best_brain);
-        // creature->brain = best_brain;
+        update_training_stats(&stats, fitnesses, creature->brain, population, elitists, &elitist_i);
     }
 
+    TraceLog(LOG_INFO, "All time best: %g", stats.alltime_max_fit);
     TraceLog(LOG_DEBUG, "Freeing training resources");
 
     free_population(population);
