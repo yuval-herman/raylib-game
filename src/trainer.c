@@ -141,11 +141,7 @@ float evaluate(RandomState *rng, Creature *creature)
     creature_reset(creature);
     for (int test = 0; test < EVALUATION_TESTS; test++)
     {
-#ifdef DETERMINISTIC_TRAINING
-        inst = inst_arr[test % ARRAY_COUNT(inst_arr)];
-#else
         inst = inst_arr[random_uint64_range(rng, 0, ARRAY_COUNT(inst_arr) - 1)];
-#endif
         b2Vec2 start_pos = get_avg_position(creature);
         b2Vec2 last_pos = start_pos;
 
@@ -443,17 +439,6 @@ void update_training_stats(TrainingStats *stats, float *fitnesses, genann *best_
 
 int creature_train(Creature *creature)
 {
-    // #ifdef DETERMINISTIC_TRAINING
-    //     /* Disable warm starting while training so the solver does not reuse cached impulse
-    //      * accumulators from previous simulations. This reduces cross-evaluation
-    //      * nondeterminism when we reset body transforms between runs. */
-    //     b2World_EnableWarmStarting(creature->world_id, false);
-    //     RandomState *rng = random_make();
-    //     random_seed(rng, 52u, 36u);
-    // #else
-    // RandomState *rng = random_make_seed();
-    // #endif
-
     RandomState *rng = random_make_seed();
     genann *population = init_population(rng, creature);
     genann *population_b_gen = init_population(rng, creature);
@@ -582,15 +567,6 @@ int creature_train(Creature *creature)
 
         // copy_weights(population + max_index, best_brain);
         // creature->brain = best_brain;
-
-        // #ifdef DETERMINISTIC_TRAINING
-        //     // Re-enable warm starting
-        //     b2World_EnableWarmStarting(creature->world_id, true);
-        // #endif
-        // for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
-        // {
-        //     genann_free(elitists[elt_i].brain);
-        // }
     }
 
     TraceLog(LOG_DEBUG, "Freeing training resources");

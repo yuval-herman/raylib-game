@@ -44,8 +44,6 @@ static_assert(CROSSOVER_BIAS >= 0 && CROSSOVER_BIAS <= 1);
 #define MAX_MUTATION_AMOUNT 0.1 // How much each weight will be able to change
 static_assert(MAX_MUTATION_AMOUNT <= 1);
 
-// #define DETERMINISTIC_TRAINING
-
 int creature_train(Creature *creature);
 
 #endif // TRAINER_HEADER
