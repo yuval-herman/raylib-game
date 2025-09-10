@@ -19,30 +19,36 @@ You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but ag
 // Numbers divisible by 18 (my laptop cores ¯\(ツ)/¯)
 // 18, 36, 54, 72, 90, 108, 126, 144, 162, 180, 198
 
+#ifndef OPTIMIZER_RUN
+
 #define ENABLE_THREADS true
 
-#define POP_SIZE 90
-#define EVOLUTION_GENERATIONS 20
+#define TREND_WINDOW 10 // How many generations to use to calculate the trend
 
-#define EVALUATION_TESTS (4)
+#define POP_SIZE 144
+#define EVOLUTION_GENERATIONS 300
+
+#define EVALUATION_TESTS (8)
 #define EVALUATION_STEPS (60 * 15)
 #define EVALUATION_EARLY_TERMINATION_STEPS (60)  // After how many steps without movement to terminate
 #define EVALUATION_PENALTY (0.5f)                // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
 #define EVALUATION_EARLY_TERMINATION_PENALTY (2) // Points to deduce
 
-#define ELITIST_AMOUNT 20
+#define ELITIST_AMOUNT 10
 static_assert(ELITIST_AMOUNT >= 0 && ELITIST_AMOUNT < POP_SIZE);
 
-#define TOURNAMENT_SIZE (POP_SIZE / 5)
-#define CROSSOVER_BIAS 0.5 // How biased should crossover be towards the stronger parent
+#define BASE_TOURNAMENT_SIZE (POP_SIZE) // Tournament size is calculated dynamically using the fitness trend. This values is used as a base value
+#define CROSSOVER_BIAS 0.6              // How biased should crossover be towards the stronger parent
 static_assert(CROSSOVER_BIAS >= 0 && CROSSOVER_BIAS <= 1);
+
+#define BASE_MUTATION_RATE 0.005 // Same as tournament size, this is dynamic. How many weights will change from the whole
+#define MAX_MUTATION_AMOUNT 0.05 // How much each weight will be able to change
+static_assert(MAX_MUTATION_AMOUNT <= 1);
 
 #define CROSSOVER_ABORT_MAX 0.5
 #define CROSSOVER_ABORT_MIN 0
 
-#define MUTATION_RATE 0.05      // How many weights will change from the whole
-#define MAX_MUTATION_AMOUNT 0.1 // How much each weight will be able to change
-static_assert(MAX_MUTATION_AMOUNT <= 1);
+#endif // OPTIMIZER_RUN
 
 int creature_train(Creature *creature);
 

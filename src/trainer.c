@@ -17,8 +17,6 @@ typedef struct Individual
     float fitness;
 } Individual;
 
-#define TREND_WINDOW 10
-
 typedef struct TrainingStats
 {
     float alltime_max_fit, max_fit, min_fit, avg_fit, fit_trend;
@@ -207,10 +205,10 @@ float evaluate(RandomState *rng, Creature *creature)
     return fitness;
 }
 
-Individual select(RandomState *rng, genann *population, float *fitnesses)
+Individual select(RandomState *rng, genann *population, float *fitnesses, int tournament_size)
 {
     size_t index_max = random_uint64_range(rng, 0, POP_SIZE - 1);
-    for (int i = 0; i < TOURNAMENT_SIZE; i++)
+    for (int i = 0; i < tournament_size; i++)
     {
         size_t index_check = random_uint64_range(rng, 0, POP_SIZE - 1);
         if (fitnesses[index_max] < fitnesses[index_check])
@@ -229,11 +227,11 @@ void crossover(RandomState *rng, const Individual stronger, const Individual wea
     }
 }
 
-void mutation(RandomState *rng, genann *ind)
+void mutation(RandomState *rng, genann *ind, double mutation_rate)
 {
     for (int i = 0; i < ind->total_weights; ++i)
     {
-        if (random_double(rng) < MUTATION_RATE)
+        if (random_double(rng) < mutation_rate)
         {
             ind->weight[i] += (random_double(rng) - 0.5) * MAX_MUTATION_AMOUNT;
             ind->weight[i] = b2ClampFloat(ind->weight[i], -0.5, 0.5);
@@ -460,6 +458,21 @@ void update_training_stats(TrainingStats *stats,
     stats->fit_trend /= TREND_WINDOW;
 }
 
+int get_tournament_size(float trend)
+{
+    int base = BASE_TOURNAMENT_SIZE * 0.5f;
+    float norm_t = (trend * POP_SIZE) / 5;
+    int ret = trend < 0 ? b2MinInt(POP_SIZE, base - norm_t) : b2MaxInt(1, (int)(base - norm_t));
+    return ret;
+}
+
+double get_mutation_rate(float trend)
+{
+    double base = BASE_MUTATION_RATE;
+    double ret = base / fabsf(trend);
+    return ret;
+}
+
 int creature_train(Creature *creature)
 {
     RandomState *rng = random_make_seed();
@@ -502,13 +515,16 @@ int creature_train(Creature *creature)
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
         crss_abort_chance = crossover_abort_chance(generation);
-        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f, trend: %+8.3f], crossover_abort_chance: [%.3f]",
+        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f, trend: %+8.3f], crossover_abort_chance: [%.3f], tournament_size: [%3d/%3d], mutation_rate: [%.3f]",
                  generation,
                  stats.max_fit,
                  stats.avg_fit,
                  stats.min_fit,
                  stats.fit_trend,
-                 crss_abort_chance);
+                 crss_abort_chance,
+                 get_tournament_size(stats.fit_trend),
+                 POP_SIZE,
+                 get_mutation_rate(stats.fit_trend));
         stats.max_fit = -INFINITY;
         stats.min_fit = INFINITY;
         stats.avg_fit = 0;
@@ -519,8 +535,9 @@ int creature_train(Creature *creature)
         }
         for (size_t pop_i = ELITIST_AMOUNT; pop_i < POP_SIZE; pop_i++)
         {
-            Individual ind_a = select(rng, population, fitnesses);
-            Individual ind_b = select(rng, population, fitnesses);
+            int tournament_size = get_tournament_size(stats.fit_trend);
+            Individual ind_a = select(rng, population, fitnesses, tournament_size);
+            Individual ind_b = select(rng, population, fitnesses, tournament_size);
 
             Individual *stronger;
             Individual *weaker;
@@ -536,7 +553,7 @@ int creature_train(Creature *creature)
             }
 
             crossover(rng, *stronger, *weaker, population_b_gen + pop_i);
-            mutation(rng, population_b_gen + pop_i);
+            mutation(rng, population_b_gen + pop_i, get_mutation_rate(stats.fit_trend));
         }
 
         genann *temp;
