@@ -1,4 +1,3 @@
-#define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
 #define NOB_EXPERIMENTAL_DELETE_OLD
 #define NOB_WARN_DEPRECATED
@@ -8,35 +7,21 @@
 #define EXTERNAL_FOLDER SRC_FOLDER "external/"
 #define OUTPUT_FILE BUILD_FOLDER "main"
 
-#if defined(_MSC_VER)
-#define nob_cc_flags(cmd) nob_cmd_append(cmd, "/W4", "/Zi", "/nologo", "/D_CRT_SECURE_NO_WARNINGS")
-#define nob_cc_include(cmd, target) cmd_append(cmd, "/I./" EXTERNAL_FOLDER "genann", "/I./raylib/" target "-build/include", "/I./box2d/" target "-build/include")
-#define nob_linker(cmd, target) cmd_append(cmd, "/LIBPATH:./raylib/" target "-build/lib", "raylib.lib", "/LIBPATH:./box2d/" target "-build/lib", "box2d.lib")
-#else
-#define nob_cc_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Wno-override-init-side-effects", "-D_POSIX_SOURCE");
-#define nob_cc_include(cmd, target)                                               \
-    do                                                                            \
-    {                                                                             \
-        cmd_append(cmd, "-I./" SRC_FOLDER);                                       \
-        cmd_append(cmd, "-I./" EXTERNAL_FOLDER "genann");                         \
-        cmd_append(cmd, temp_sprintf("-I./raylib/%s-build/include", target));     \
-        cmd_append(cmd, temp_sprintf("-I./box2d/%s-build/include", target));      \
-        cmd_append(cmd, temp_sprintf("-I./pcg_random/%s-build/include", target)); \
-    } while (0)
-#define nob_linker(cmd, target)                                                               \
-    do                                                                                        \
-    {                                                                                         \
-        cmd_append(cmd, temp_sprintf("-L./raylib/%s-build/lib", target), "-lraylib");         \
-        cmd_append(cmd, temp_sprintf("-L./box2d/%s-build/lib", target), "-lbox2d", "-lm");    \
-        cmd_append(cmd, temp_sprintf("-L./pcg_random/%s-build/lib", target), "-lpcg_random"); \
-    } while (0)
-#endif
+#define NOB_REBUILD_URSELF(binary_path, source_path) "cc", "-Wall", "-Wextra", "-Wswitch-enum", \
+                                                     "-I./build_src", "-I./",                   \
+                                                     "-o", binary_path, source_path
 
-#include "nob.h"
+#include "build_src/shared.h"
+#include "build_src/box2d-build.h"
+#include "build_src/raylib-build.h"
+#include "build_src/pcg-c-build.h"
 
 #define FLAG_IMPLEMENTATION
 #define FLAG_PUSH_DASH_DASH_BACK
 #include "flag.h"
+
+#define NOB_IMPLEMENTATION
+#include "nob.h"
 
 #ifdef _WIN32
 #define DEFAULT_TARGET "windows"
@@ -46,6 +31,8 @@
 
 #define FLAG_SET(flag) flag ? "set" : "unset"
 
+Cmd cmd = {0};
+
 void usage(FILE *stream)
 {
     fprintf(stream, "Usage: ./nob [OPTIONS]\n");
@@ -53,9 +40,65 @@ void usage(FILE *stream)
     flag_print_options(stream);
 }
 
+bool build_libs()
+{
+    if (!nob_mkdir_if_not_exists(BUILD_DIR) || !nob_mkdir_if_not_exists(INCLUDE_DIR))
+    {
+        nob_log(ERROR, "failed creating build directory");
+        return false;
+    }
+
+    // ##### box2d
+    if (!nob_file_exists(BUILD_DIR "libbox2d.a"))
+    {
+        if (!build_box2d(&cmd))
+        {
+            nob_log(ERROR, "box2d build failed");
+            return false;
+        }
+    }
+    else
+    {
+        nob_log(NOB_INFO, "libbox2d.a found, skiping box2d build");
+    }
+
+    // ##### raylib
+    if (!nob_file_exists(BUILD_DIR "libraylib.a"))
+    {
+        if (!build_raylib(&cmd))
+        {
+            nob_log(ERROR, "raylib build failed");
+            return false;
+        }
+    }
+    else
+    {
+        nob_log(NOB_INFO, "libraylib.a found, skiping raylib build");
+    }
+
+    // ##### pcg-c
+    if (!nob_file_exists(BUILD_DIR "libpcg_random.a"))
+    {
+        if (!build_pcg_c(&cmd))
+        {
+            nob_log(ERROR, "pcg_c build failed");
+            return false;
+        }
+    }
+    else
+    {
+        nob_log(NOB_INFO, "libpcg_random.a found, skiping pcg_c build");
+    }
+    return true;
+}
+
 int main(int argc, char **argv)
 {
-    NOB_GO_REBUILD_URSELF(argc, argv);
+    NOB_GO_REBUILD_URSELF_PLUS(argc, argv,
+                               "build_src/shared.h",
+                               "build_src/box2d-build.h",
+                               "build_src/raylib-build.h",
+                               "build_src/pcg-c-build.h");
 
     bool *help = flag_bool("help", false, "Print this help to stdout and exit with 0");
     bool *run = flag_bool("run", false, "Run main after compilation");
@@ -63,6 +106,7 @@ int main(int argc, char **argv)
     bool *debug = flag_bool("debug", false, "Compile with debug symbols");
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
+    // bool *run_optimizer = flag_bool("run_optimizer", false, "Instead of building the program normally, this will run an optimizer on the values defined in trainer.h and report back findings");
     char **target = flag_str("target", DEFAULT_TARGET, "Compilation target (windows/linux)");
 
     if (!flag_parse(argc, argv))
@@ -78,9 +122,6 @@ int main(int argc, char **argv)
         exit(0);
     }
 
-    if (!mkdir_if_not_exists(BUILD_FOLDER))
-        return 1;
-
     nob_log(INFO, "==================================");
     nob_log(INFO, "Compilation target: %s", *target);
     nob_log(INFO, "Flags:");
@@ -88,10 +129,79 @@ int main(int argc, char **argv)
     nob_log(INFO, "\t\t%-15s:\t%5s", "debug", FLAG_SET(*debug));
     nob_log(INFO, "\t\t%-15s:\t%5s", "optimize", FLAG_SET(*optimize));
     nob_log(INFO, "\t\t%-15s:\t%5s", "force", FLAG_SET(*force));
+    // nob_log(INFO, "\t\t%-15s:\t%5s", "run_optimizer", FLAG_SET(*run_optimizer));
     nob_log(INFO, "==================================");
 
-    Cmd cmd = {0};
+    if (!build_libs())
+        return 1;
 
+#if 0
+    if (*run_optimizer)
+    {
+        const int search_runs = 200;
+        const int avg_runs = 5;
+        float best_fitness = 0, best_trend = 0;
+        OptimizerValues best_op_values;
+
+        RandomState *rng = random_make_seed();
+        String_Builder sb = {0};
+
+        for (int search = 0; search < search_runs; search++)
+        {
+            nob_log(INFO, "Running search #%d best so far: fitness=%9.6f trend=%9.6f", search, best_fitness, best_trend);
+            write_values_to_file(best_op_values);
+
+            float fitness = 0, trend = 0;
+            OptimizerValues op_values = random_op_values(rng);
+            for (int i = 0; i < avg_runs; i++)
+            {
+                // prep normal build command
+                if (!cmd_prep(&cmd, *target, *move_window, *debug, *optimize))
+                    return 1;
+                // add optimizer values to try and compile
+                append_optimizer_flags(&cmd, op_values);
+                nob_minimal_log_level = NOB_WARNING;
+                if (!cmd_run(&cmd))
+                    return 1;
+
+                // run optimizer
+                cmd_append(&cmd, "./" OUTPUT_FILE);
+                if (!cmd_run(&cmd, .stdout_path = "./opt_stdout.txt", .stderr_path = "./opt_stderr.txt"))
+                    return 1;
+                nob_minimal_log_level = NOB_INFO;
+
+                // get optimizer values result
+                sb.count = 0;
+                nob_read_entire_file("./opt_stdout.txt", &sb);
+                float loc_fitness = 0, loc_trend = 0;
+
+                sscanf(sb.items, "%a,%a", &loc_fitness, &loc_trend);
+                nob_log(INFO, "avg run #%d fitness=%9.6f trend=%9.6f", i, loc_fitness, loc_trend);
+                fitness += loc_fitness;
+                trend += loc_trend;
+            }
+            fitness /= avg_runs;
+            trend /= avg_runs;
+            if (trend * 100 + fitness > best_trend * 100 + best_fitness)
+            {
+                best_fitness = fitness;
+                best_trend = trend;
+                best_op_values = op_values;
+            }
+
+            if (fitness > 100)
+            {
+                nob_log(WARNING, "Some parse error or something happened, this fitness value will be ignored");
+            }
+        }
+        delete_file("./opt_stdout.txt");
+        delete_file("./opt_stderr.txt");
+        write_values_to_file(best_op_values);
+        nob_log(INFO, "best values and achieved fitness written to ./opt_output.txt");
+        nob_log(INFO, "overall best fitness was %g", best_fitness);
+        return 0;
+    }
+#endif
     File_Paths no_path_files = {0};
     File_Paths src_files = {0};
     String_Builder src_sb = {0};
@@ -115,50 +225,9 @@ int main(int argc, char **argv)
     }
 
     // TODO detect flag changes, such as move_window, as also requiring a rebuild
-    if (!readdir || *force || nob_needs_rebuild(OUTPUT_FILE, src_files.items, src_files.count))
+    if (!read_dir_success || *force || nob_needs_rebuild(OUTPUT_FILE, src_files.items, src_files.count))
     {
-        if (strcmp(*target, "windows") == 0)
-        {
-#ifdef _WIN32
-            nob_cc(&cmd);
-#else
-            nob_cmd_append(&cmd, "x86_64-w64-mingw32-gcc");
-#endif
-        }
-        else if (strcmp(*target, "linux") == 0)
-        {
-#ifdef _WIN32
-            nob_log(ERROR, "Cross compilation on windows is not supported");
-            exit(1);
-#else
-            nob_cc(&cmd);
-#endif
-        }
-        else
-        {
-            nob_log(ERROR, "Target '%s' is not supported", *target);
-            exit(1);
-        }
-
-        nob_cc_flags(&cmd);
-        if (*move_window)
-            cmd_append(&cmd, "-DMOVE_WINDOW");
-        if (*debug)
-            cmd_append(&cmd, "-ggdb", "-O0");
-        else if (*optimize)
-            cmd_append(&cmd, "-O3", "-march=native");
-        nob_cc_include(&cmd, *target);
-        nob_cc_output(&cmd, OUTPUT_FILE);
-        nob_cc_inputs(&cmd,
-                      SRC_FOLDER "main.c",
-                      SRC_FOLDER "physics.c",
-                      SRC_FOLDER "creature.c",
-                      SRC_FOLDER "trainer.c",
-                      SRC_FOLDER "random.c",
-                      EXTERNAL_FOLDER "genann/genann.c", );
-        nob_linker(&cmd, *target);
-
-        if (!cmd_run(&cmd))
+        if (!compile_program(&cmd, *target, *move_window, *debug, *optimize))
             return 1;
     }
     else

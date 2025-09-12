@@ -1,0 +1,9 @@
+[submodule "external/box2d"]
+	path = external/box2d
+	url = https://github.com/erincatto/box2d.git
+[submodule "external/raylib"]
+	path = external/raylib
+	url = https://github.com/raysan5/raylib
+[submodule "external/pcg-c"]
+	path = external/pcg-c
+	url = https://github.com/imneme/pcg-c.git
