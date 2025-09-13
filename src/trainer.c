@@ -74,37 +74,6 @@ TrainingStats make_training_stats()
     };
 }
 
-// Number of CPU cores on the machine
-int n_cores(void)
-{
-#if defined(ENABLE_THREADS) && ENABLE_THREADS
-#ifdef _WIN32
-    SYSTEM_INFO siSysInfo;
-    GetSystemInfo(&siSysInfo);
-    return siSysInfo.dwNumberOfProcessors;
-#else
-    return sysconf(_SC_NPROCESSORS_ONLN);
-#endif
-#else
-    return 1;
-#endif
-}
-
-// Get average node position
-b2Vec2 get_avg_position(Creature *creature)
-{
-    b2Vec2 avg = {0};
-    for (size_t body_i = 0; body_i < creature->node_amount; body_i++)
-    {
-        b2Vec2 pos = b2Body_GetPosition(creature->node_ids[body_i]);
-        avg.x += pos.x;
-        avg.y += pos.y;
-    }
-    avg.x /= creature->node_amount;
-    avg.y /= creature->node_amount;
-    return avg;
-}
-
 genann *init_population(RandomState *rng, Creature *creature)
 {
     genann *ann = creature->brain;
@@ -138,7 +107,7 @@ void free_population(genann *population)
     free(population);
 }
 
-float evaluate(RandomState *rng, Creature *creature)
+float evaluate(RandomState *rng, Creature *creature, float penalty_mul)
 {
     // TODO: I'm ignoring UP for now since it's a bit complicated
     CreatureInstruction inst_arr[] = {INST_NONE, INST_LEFT, INST_RIGHT};
@@ -149,19 +118,20 @@ float evaluate(RandomState *rng, Creature *creature)
     CreatureInstruction inst;
 
     creature_reset(creature);
+    creature_rotate(creature, creature_get_center(creature), random_float(rng) * B2_PI);
     for (int test = 0; test < EVALUATION_TESTS; test++)
     {
         inst = inst_arr[random_uint64_range(rng, 0, ARRAY_COUNT(inst_arr) - 1)];
-        b2Vec2 start_pos = get_avg_position(creature);
+        b2Vec2 start_pos = creature_get_center(creature);
         b2Vec2 last_pos = start_pos;
 
         // I use a random amount of steps so the creature won't get used to fixed input
-        int steps = random_uint64_upto(rng, EVALUATION_STEPS);
+        int steps = random_uint64_range(rng, MIN_EVALUATION_STEPS, MAX_EVALUATION_STEPS);
         for (int i = 0; i < steps; i++)
         {
             creature_think(creature, inst);
             b2World_Step(creature->world_id, TIME_STEP, SUB_STEP_COUNT);
-            b2Vec2 pos = get_avg_position(creature);
+            b2Vec2 pos = creature_get_center(creature);
 
             early_termination = inst != INST_NONE && (fabsf(last_pos.x - pos.x) < FLT_EPSILON);
             if (early_termination && ++stagnation_steps == EVALUATION_EARLY_TERMINATION_STEPS)
@@ -177,7 +147,8 @@ float evaluate(RandomState *rng, Creature *creature)
         // Reward for standing up
         if (last_pos.y > creature->node_radius)
         {
-            fitness += 5;
+            // Divide by EVALUATION_TESTS so that more tests won't benefit creatures that don't move but stand up
+            fitness += 10 / EVALUATION_TESTS;
         }
 
         // Penalize for not moving
@@ -191,7 +162,7 @@ float evaluate(RandomState *rng, Creature *creature)
         // Penalize for moving while instructed to stop
         if (inst == INST_NONE)
         {
-            fitness -= distance * EVALUATION_PENALTY;
+            fitness -= distance * penalty_mul;
         }
         else
         {
@@ -200,22 +171,23 @@ float evaluate(RandomState *rng, Creature *creature)
             //  Reward for moving in the correct direction
             if (moved_right == should_move_right)
             {
-                fitness += distance;
+                fitness += powf(distance, 2);
             }
             // Penalize for moving in the wrong direction
             else
-                fitness -= distance * EVALUATION_PENALTY;
+                fitness -= powf(distance, 2) * penalty_mul;
         }
     }
     return fitness;
 }
 
-Individual select(RandomState *rng, genann *population, float *fitnesses, int tournament_size)
+Individual select_ind(RandomState *rng, genann *population, float *fitnesses, int tournament_size)
 {
     size_t index_max = random_uint64_range(rng, 0, POP_SIZE - 1);
     for (int i = 0; i < tournament_size; i++)
     {
         size_t index_check = random_uint64_range(rng, 0, POP_SIZE - 1);
+
         if (fitnesses[index_max] < fitnesses[index_check])
             index_max = index_check;
     }
@@ -265,6 +237,27 @@ double crossover_abort_chance(int generation)
     return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
 }
 
+int get_tournament_size(float trend)
+{
+    int base = BASE_TOURNAMENT_SIZE * 0.5f;
+    float norm_t = ((trend / 10) * POP_SIZE);
+    int ret = trend < 0 ? b2MinInt(POP_SIZE, base - norm_t) : b2MaxInt(1, (int)(base - norm_t));
+    return ret;
+}
+
+double get_mutation_rate(float trend)
+{
+    double base = BASE_MUTATION_RATE;
+    double ret = base / (fabsf(trend / 10) + 1);
+    return ret;
+}
+
+float get_evaluation_penalty(int generation)
+{
+    float mul = (MAX_EVALUATION_PENALTY - MIN_EVALUATION_PENALTY) / END_EVALUATION_PENALTY_GENERATION;
+    return b2MinFloat(MAX_EVALUATION_PENALTY, MIN_EVALUATION_PENALTY + generation * mul);
+}
+
 int thread_job(void *arg)
 {
     RandomState *rng = random_make_seed();
@@ -285,7 +278,7 @@ int thread_job(void *arg)
         for (size_t pop_i = data->start_index; pop_i < data->end_index; pop_i++)
         {
             data->creature.brain = data->population + pop_i;
-            data->fitnesses[pop_i] = evaluate(rng, &data->creature);
+            data->fitnesses[pop_i] = evaluate(rng, &data->creature, get_evaluation_penalty(local_epoch));
         }
 
         // Notify main we finished this epoch
@@ -463,21 +456,6 @@ void update_training_stats(TrainingStats *stats,
     stats->fit_trend /= TREND_WINDOW;
 }
 
-int get_tournament_size(float trend)
-{
-    int base = BASE_TOURNAMENT_SIZE * 0.5f;
-    float norm_t = (trend * POP_SIZE) / 5;
-    int ret = trend < 0 ? b2MinInt(POP_SIZE, base - norm_t) : b2MaxInt(1, (int)(base - norm_t));
-    return ret;
-}
-
-double get_mutation_rate(float trend)
-{
-    double base = BASE_MUTATION_RATE;
-    double ret = base / fabsf(trend);
-    return ret;
-}
-
 int creature_train(Creature *creature)
 {
     RandomState *rng = random_make_seed();
@@ -520,7 +498,7 @@ int creature_train(Creature *creature)
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
         crss_abort_chance = crossover_abort_chance(generation);
-        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f, trend: %+8.3f], crossover_abort_chance: [%.3f], tournament_size: [%3d/%3d], mutation_rate: [%.3f]",
+        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f, trend: %+8.3f], crossover_abort_chance: [%.3f], tournament_size: [%3d/%3d], mutation_rate: [%.3f], evaluation_penalty: [%.3f]",
                  generation,
                  stats.max_fit,
                  stats.avg_fit,
@@ -529,7 +507,8 @@ int creature_train(Creature *creature)
                  crss_abort_chance,
                  get_tournament_size(stats.fit_trend),
                  POP_SIZE,
-                 get_mutation_rate(stats.fit_trend));
+                 get_mutation_rate(stats.fit_trend),
+                 get_evaluation_penalty(generation));
         stats.max_fit = -INFINITY;
         stats.min_fit = INFINITY;
         stats.avg_fit = 0;
@@ -541,8 +520,8 @@ int creature_train(Creature *creature)
         for (size_t pop_i = ELITIST_AMOUNT; pop_i < POP_SIZE; pop_i++)
         {
             int tournament_size = get_tournament_size(stats.fit_trend);
-            Individual ind_a = select(rng, population, fitnesses, tournament_size);
-            Individual ind_b = select(rng, population, fitnesses, tournament_size);
+            Individual ind_a = select_ind(rng, population, fitnesses, tournament_size);
+            Individual ind_b = select_ind(rng, population, fitnesses, tournament_size);
 
             Individual *stronger;
             Individual *weaker;
@@ -572,6 +551,11 @@ int creature_train(Creature *creature)
     }
 
     TraceLog(LOG_INFO, "All time best: %g", stats.alltime_max_fit);
+#ifdef OPTIMIZER_RUN
+    printf("%a,%a", stats.alltime_max_fit, stats.fit_trend);
+    // In an optimizer run don't even bother freeing resources, the OS will take care of that...
+    return 0;
+#endif
     TraceLog(LOG_DEBUG, "Freeing training resources");
 
     free_population(population);

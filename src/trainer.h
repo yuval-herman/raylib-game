@@ -23,32 +23,40 @@ You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but ag
 
 #define ENABLE_THREADS true
 
-#define TREND_WINDOW 10 // How many generations to use to calculate the trend
+#define TREND_WINDOW 15 // How many generations to use to calculate the trend
 
-#define POP_SIZE 144
+#define POP_SIZE 90
 #define EVOLUTION_GENERATIONS 300
 
-#define EVALUATION_TESTS (8)
-#define EVALUATION_STEPS (60 * 15)
-#define EVALUATION_EARLY_TERMINATION_STEPS (60)  // After how many steps without movement to terminate
-#define EVALUATION_PENALTY (0.5f)                // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
-#define EVALUATION_EARLY_TERMINATION_PENALTY (2) // Points to deduce
+#define EVALUATION_TESTS 6
+#define MAX_EVALUATION_STEPS 60 * 15                                  // maximum evaluation steps in noneterminstic mode, actual amount otherwise
+#define MIN_EVALUATION_STEPS 60 * 3                                   // minimum evaluation steps
+#define EVALUATION_EARLY_TERMINATION_STEPS 10                         // After how many steps without movement to terminate
+#define MIN_EVALUATION_PENALTY 0.2                                    // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
+#define MAX_EVALUATION_PENALTY 1                                      // Multiplier to reduce from deduction (1 will reduce full value 0.5 half etc...)
+#define END_EVALUATION_PENALTY_GENERATION (EVOLUTION_GENERATIONS / 3) // The generation by which EVALUATION_PENALTY will reach it's maximum
+#define EVALUATION_EARLY_TERMINATION_PENALTY 10                       // Points to deduce
 
-#define ELITIST_AMOUNT 10
-static_assert(ELITIST_AMOUNT >= 0 && ELITIST_AMOUNT < POP_SIZE);
+#define ELITIST_AMOUNT 8
 
-#define BASE_TOURNAMENT_SIZE (POP_SIZE) // Tournament size is calculated dynamically using the fitness trend. This values is used as a base value
-#define CROSSOVER_BIAS 0.6              // How biased should crossover be towards the stronger parent
-static_assert(CROSSOVER_BIAS >= 0 && CROSSOVER_BIAS <= 1);
+#define BASE_TOURNAMENT_SIZE POP_SIZE // Tournament size is calculated dynamically using the fitness trend. This values is used as a base value
+#define CROSSOVER_BIAS 0.5            // How biased should crossover be towards the stronger parent
 
-#define BASE_MUTATION_RATE 0.005 // Same as tournament size, this is dynamic. How many weights will change from the whole
-#define MAX_MUTATION_AMOUNT 0.05 // How much each weight will be able to change
-static_assert(MAX_MUTATION_AMOUNT <= 1);
+#define BASE_MUTATION_RATE 0.3  // Same as tournament size, this is dynamic. How many weights will change from the whole
+#define MAX_MUTATION_AMOUNT 0.7 // How much each weight will be able to change
 
 #define CROSSOVER_ABORT_MAX 0.5
 #define CROSSOVER_ABORT_MIN 0
 
 #endif // OPTIMIZER_RUN
+
+// bigger then the amount of instructions
+static_assert(MIN_EVALUATION_STEPS < MAX_EVALUATION_STEPS);
+static_assert(EVALUATION_TESTS > 4);
+static_assert(ELITIST_AMOUNT >= 0 && ELITIST_AMOUNT < POP_SIZE);
+static_assert(CROSSOVER_BIAS >= 0 && CROSSOVER_BIAS <= 1);
+static_assert(MAX_MUTATION_AMOUNT <= 1);
+static_assert(BASE_TOURNAMENT_SIZE <= POP_SIZE);
 
 int creature_train(Creature *creature);
 

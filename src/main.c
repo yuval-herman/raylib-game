@@ -1,11 +1,53 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "raylib.h"
 #include "assert.h"
 #include "physics.h"
 #include "creature.h"
 #include "trainer.h"
+
+// This is actually a copy of the actual TraceLog function from raylib,
+// Just instead of logging to stdout, it logs to stderr.
+void errLog(int logType, const char *text, va_list args)
+{
+
+    char buffer[256] = {0};
+
+    switch (logType)
+    {
+    case LOG_TRACE:
+        strcpy(buffer, "TRACE: ");
+        break;
+    case LOG_DEBUG:
+        strcpy(buffer, "DEBUG: ");
+        break;
+    case LOG_INFO:
+        strcpy(buffer, "INFO: ");
+        break;
+    case LOG_WARNING:
+        strcpy(buffer, "WARNING: ");
+        break;
+    case LOG_ERROR:
+        strcpy(buffer, "ERROR: ");
+        break;
+    case LOG_FATAL:
+        strcpy(buffer, "FATAL: ");
+        break;
+    default:
+        break;
+    }
+
+    unsigned int textSize = (unsigned int)strlen(text);
+    memcpy(buffer + strlen(buffer), text, (textSize < (256 - 12)) ? textSize : (256 - 12));
+    strcat(buffer, "\n");
+    vfprintf(stderr, buffer, args);
+    fflush(stderr);
+
+    if (logType == LOG_FATAL)
+        exit(EXIT_FAILURE); // If fatal logging, exit program
+}
 
 int main(void)
 {
@@ -33,12 +75,22 @@ int main(void)
         {3, 0, 0},
     };
     Creature creature = creature_make(rng, world_id, node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
+#ifdef OPTIMIZER_RUN
+    SetTraceLogCallback(errLog);
+    TraceLog(LOG_INFO, "Running in optimizer mode");
     if (creature_train(&creature) != 0)
     {
         TraceLog(LOG_ERROR, "error while training");
         return 1;
     }
-    // return 0;
+    return 0;
+#else
+    if (creature_train(&creature) != 0)
+    {
+        TraceLog(LOG_ERROR, "error while training");
+        return 1;
+    }
+#endif
 
     // #==============================================================
     //                       RAYLIB INITIALIZATION

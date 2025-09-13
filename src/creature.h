@@ -55,5 +55,7 @@ void creature_destroy(Creature *creature);
 void creature_draw(Creature creature);
 void creature_update(Creature *creature);
 void creature_think(Creature *creature, CreatureInstruction);
+b2Vec2 creature_get_center(const Creature *creature);
+void creature_rotate(Creature *creature, b2Vec2 origin, float rad);
 
 #endif // CREATURE_HEADER

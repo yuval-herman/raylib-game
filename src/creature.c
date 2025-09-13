@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "creature.h"
+#include "raylib.h"
 #include "raymath.h"
 
 const float default_node_radius = 1.0f;
@@ -9,6 +10,20 @@ const float default_motor_speed = 1.0f;
 const float max_motor_speed = 100.0f;
 const float min_motor_speed = -100.0f;
 const float default_motor_force = 200.0f;
+
+b2Vec2 creature_get_center(const Creature *creature)
+{
+    b2Vec2 center = b2Vec2_zero;
+    for (unsigned int body_i = 0; body_i < creature->node_amount; body_i++)
+    {
+        b2Vec2 pos = b2Body_GetPosition(creature->node_ids[body_i]);
+        center.x += pos.x;
+        center.y += pos.y;
+    }
+    center.x /= creature->node_amount;
+    center.y /= creature->node_amount;
+    return center;
+}
 
 // Gets all node positions in an interleaved array [x,y,x,y,...]
 // Positions are relative to creature center
@@ -189,6 +204,23 @@ void creature_reset(Creature *creature)
     creature_reset_motors(creature);
 }
 
+// Rotate the creature by a radian around a given point
+void creature_rotate(Creature *creature, b2Vec2 origin, float rad)
+{
+    float cos_o = cosf(rad);
+    float sin_o = sinf(rad);
+
+    for (size_t node_i = 0; node_i < creature->node_amount; node_i++)
+    {
+        b2Vec2 pos = b2Sub(b2Body_GetPosition(creature->node_ids[node_i]), origin);
+        // Use intermediate variables so can update pos.x and not overwrite the original x postion
+        float x = pos.x, y = pos.y;
+        pos.x = x * cos_o - y * sin_o;
+        pos.y = x * sin_o + y * cos_o;
+        b2Body_SetTransform(creature->node_ids[node_i], b2Add(pos, origin), b2Rot_identity);
+    }
+}
+
 void creature_draw(Creature creature)
 {
     // TODO:
@@ -258,6 +290,7 @@ void creature_update(Creature *creature)
     {
         creature_reset(creature);
     }
+
     if (IsKeyDown(KEY_RIGHT))
     {
         creature_think(creature, INST_RIGHT);
@@ -266,7 +299,11 @@ void creature_update(Creature *creature)
     {
         creature_think(creature, INST_LEFT);
     }
-    else if (IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_LEFT))
+    else if (IsKeyDown(KEY_SPACE))
+    {
+        creature_reset_motors(creature);
+    }
+    else
     {
         creature_think(creature, INST_NONE);
     }
