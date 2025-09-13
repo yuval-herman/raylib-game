@@ -1,4 +1,5 @@
 #include "physics.h"
+#include "raylib.h"
 
 b2WorldId physics_make_world()
 {
@@ -23,13 +24,4 @@ b2BodyId physics_make_ground(b2WorldId world_id)
 
     b2CreatePolygonShape(ground_id, &shape_def, &polygon);
     return ground_id;
-}
-
-Vector2 b2rVec(b2Vec2 vec)
-{
-    return (Vector2){vec.x, -vec.y};
-}
-b2Vec2 r2bVec(b2Vec2 vec)
-{
-    return (b2Vec2){vec.x, -vec.y};
 }

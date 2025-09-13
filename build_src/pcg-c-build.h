@@ -57,7 +57,7 @@ bool build_pcg_c(Nob_Cmd *cmd)
         sb_append_cstr(&sb, src_files[i]);
         sb_append_null(&sb);
 
-        nob_cmd_append(cmd, strdup(sb.items));
+        nob_cmd_append(cmd, temp_strdup(sb.items));
 
         nob_cmd_append(cmd, "-std=c99");
         // TODO: build 2 versions (or more), one for debug, one for speed (optmize)
@@ -71,7 +71,7 @@ bool build_pcg_c(Nob_Cmd *cmd)
     if (!nob_procs_flush(&procs))
         return false;
 
-    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR "libpcg_random.a");
+    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR PCG_C_LIB_FILE);
     for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
     {
         sb.count = 0;
@@ -81,14 +81,14 @@ bool build_pcg_c(Nob_Cmd *cmd)
         sb_append_cstr(&sb, ".o");
         sb_append_null(&sb);
 
-        nob_cmd_append(cmd, strdup(sb.items));
+        nob_cmd_append(cmd, temp_strdup(sb.items));
     }
     if (!nob_cmd_run(cmd))
         return false;
 
     // optimize library
-    cmd_append(cmd, "ranlib", BUILD_DIR "libpcg_random.a");
-    if (nob_cmd_run(cmd))
+    cmd_append(cmd, "ranlib", BUILD_DIR PCG_C_LIB_FILE);
+    if (!nob_cmd_run(cmd))
     {
         nob_log(WARNING, "failed optimizing library");
     }

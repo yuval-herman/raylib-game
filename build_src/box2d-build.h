@@ -74,7 +74,7 @@ bool build_box2d(Nob_Cmd *cmd)
     if (!nob_procs_flush(&procs))
         return false;
 
-    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR "libbox2d.a");
+    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR BOX2D_LIB_FILE);
     for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
     {
         nob_cmd_append(cmd, nob_temp_sprintf("%s%s.o", BOX2D_BUILD, src_files[i]));
@@ -83,8 +83,8 @@ bool build_box2d(Nob_Cmd *cmd)
         return false;
 
     // optimize library
-    cmd_append(cmd, "ranlib", BUILD_DIR "libbox2d.a");
-    if (nob_cmd_run(cmd))
+    cmd_append(cmd, "ranlib", BUILD_DIR BOX2D_LIB_FILE);
+    if (!nob_cmd_run(cmd))
     {
         nob_log(WARNING, "failed optimizing library");
     }

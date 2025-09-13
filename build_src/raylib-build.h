@@ -58,11 +58,18 @@ bool build_raylib(Nob_Cmd *cmd)
         sb_append_cstr(&sb, src_files[i]);
         sb_append_null(&sb);
 
-        nob_cmd_append(cmd, strdup(sb.items));
+        nob_cmd_append(cmd, temp_strdup(sb.items));
 
-        nob_cmd_append(cmd, "-D_GNU_SOURCE",
+        nob_cmd_append(cmd, "-D_GNU_SOURCE", "-U_GNU_SOURCE",
                        "-DPLATFORM_DESKTOP_GLFW", "-DGRAPHICS_API_OPENGL_33",
-                       "-std=c99", "-fPIC", "-D_GLFW_X11");
+                       "-std=c99",
+#if _WIN32
+                       "-DUNICODE"
+#else
+                       "-fPIC",
+                       "-D_GLFW_X11"
+#endif
+        );
         // TODO: build 2 versions (or more), one for debug, one for speed (optmize)
         RAYLIB_OPTIMIZE_FLAGS(cmd);
 
@@ -74,7 +81,7 @@ bool build_raylib(Nob_Cmd *cmd)
     if (!nob_procs_flush(&procs))
         return false;
 
-    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR "libraylib.a");
+    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR RAYLIB_LIB_FILE);
     for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
     {
         sb.count = 0;
@@ -84,14 +91,14 @@ bool build_raylib(Nob_Cmd *cmd)
         sb_append_cstr(&sb, ".o");
         sb_append_null(&sb);
 
-        nob_cmd_append(cmd, strdup(sb.items));
+        nob_cmd_append(cmd, temp_strdup(sb.items));
     }
     if (!nob_cmd_run(cmd))
         return false;
 
     // optimize library
-    cmd_append(cmd, "ranlib", BUILD_DIR "libraylib.a");
-    if (nob_cmd_run(cmd))
+    cmd_append(cmd, "ranlib", BUILD_DIR RAYLIB_LIB_FILE);
+    if (!nob_cmd_run(cmd))
     {
         nob_log(WARNING, "failed optimizing library");
     }

@@ -2,15 +2,6 @@
 #define NOB_EXPERIMENTAL_DELETE_OLD
 #define NOB_WARN_DEPRECATED
 
-#define BUILD_FOLDER "build/"
-#define SRC_FOLDER "src/"
-#define EXTERNAL_FOLDER SRC_FOLDER "external/"
-#define OUTPUT_FILE BUILD_FOLDER "main"
-
-#define NOB_REBUILD_URSELF(binary_path, source_path) "cc", "-Wall", "-Wextra", "-Wswitch-enum", \
-                                                     "-I./build_src", "-I./",                   \
-                                                     "-o", binary_path, source_path
-
 #include "build_src/shared.h"
 #include "build_src/box2d-build.h"
 #include "build_src/raylib-build.h"
@@ -49,7 +40,7 @@ bool build_libs()
     }
 
     // ##### box2d
-    if (!nob_file_exists(BUILD_DIR "libbox2d.a"))
+    if (!nob_file_exists(BUILD_DIR BOX2D_LIB_FILE))
     {
         if (!build_box2d(&cmd))
         {
@@ -59,11 +50,11 @@ bool build_libs()
     }
     else
     {
-        nob_log(NOB_INFO, "libbox2d.a found, skiping box2d build");
+        nob_log(NOB_INFO, BOX2D_LIB_FILE " found, skiping box2d build");
     }
 
     // ##### raylib
-    if (!nob_file_exists(BUILD_DIR "libraylib.a"))
+    if (!nob_file_exists(BUILD_DIR RAYLIB_LIB_FILE))
     {
         if (!build_raylib(&cmd))
         {
@@ -73,11 +64,11 @@ bool build_libs()
     }
     else
     {
-        nob_log(NOB_INFO, "libraylib.a found, skiping raylib build");
+        nob_log(NOB_INFO, RAYLIB_LIB_FILE " found, skiping raylib build");
     }
 
     // ##### pcg-c
-    if (!nob_file_exists(BUILD_DIR "libpcg_random.a"))
+    if (!nob_file_exists(BUILD_DIR PCG_C_LIB_FILE))
     {
         if (!build_pcg_c(&cmd))
         {
@@ -87,7 +78,7 @@ bool build_libs()
     }
     else
     {
-        nob_log(NOB_INFO, "libpcg_random.a found, skiping pcg_c build");
+        nob_log(NOB_INFO, PCG_C_LIB_FILE " found, skiping pcg_c build");
     }
     return true;
 }
@@ -107,7 +98,7 @@ int main(int argc, char **argv)
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
     // bool *run_optimizer = flag_bool("run_optimizer", false, "Instead of building the program normally, this will run an optimizer on the values defined in trainer.h and report back findings");
-    char **target = flag_str("target", DEFAULT_TARGET, "Compilation target (windows/linux)");
+    // char **target = flag_str("target", DEFAULT_TARGET, "Compilation target (windows/linux)");
 
     if (!flag_parse(argc, argv))
     {
@@ -123,7 +114,7 @@ int main(int argc, char **argv)
     }
 
     nob_log(INFO, "==================================");
-    nob_log(INFO, "Compilation target: %s", *target);
+    // nob_log(INFO, "Compilation target: %s", *target);
     nob_log(INFO, "Flags:");
     nob_log(INFO, "\t\t%-15s:\t%5s", "move_window", FLAG_SET(*move_window));
     nob_log(INFO, "\t\t%-15s:\t%5s", "debug", FLAG_SET(*debug));
@@ -209,13 +200,13 @@ int main(int argc, char **argv)
 
     if (!*force)
     {
-        read_dir_success = read_entire_dir(SRC_FOLDER, &no_path_files);
+        read_dir_success = read_entire_dir(SRC_DIR, &no_path_files);
         if (read_dir_success)
         {
             for (size_t i = 0; i < no_path_files.count; i++)
             {
                 src_sb.count = 0;
-                sb_append_cstr(&src_sb, SRC_FOLDER);
+                sb_append_cstr(&src_sb, SRC_DIR);
                 sb_append_cstr(&src_sb, "/");
                 sb_append_cstr(&src_sb, no_path_files.items[i]);
                 sb_append_null(&src_sb);
@@ -227,7 +218,7 @@ int main(int argc, char **argv)
     // TODO detect flag changes, such as move_window, as also requiring a rebuild
     if (!read_dir_success || *force || nob_needs_rebuild(OUTPUT_FILE, src_files.items, src_files.count))
     {
-        if (!compile_program(&cmd, *target, *move_window, *debug, *optimize))
+        if (!compile_program(&cmd, *move_window, *debug, *optimize))
             return 1;
     }
     else

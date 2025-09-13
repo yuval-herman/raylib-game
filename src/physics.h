@@ -3,7 +3,6 @@
 
 #include "assert.h"
 #include "box2d.h"
-#include "raylib.h"
 
 #define TIME_STEP 1.0f / 60.0f
 #define SUB_STEP_COUNT 4
@@ -17,8 +16,10 @@ b2BodyId physics_make_ground(b2WorldId world_id);
 #define getRectOrigin(rect) \
     (Vector2){rect.width / 2, 0}
 
-Vector2 b2rVec(b2Vec2 vec);
+#define b2rVec(vec) \
+    (Vector2) { vec.x, -vec.y }
 
-b2Vec2 r2bVec(b2Vec2 vec);
+#define r2bVec(vec) \
+    (b2Vec2) { vec.x, -vec.y }
 
 #endif // PHYSICS_HEADER

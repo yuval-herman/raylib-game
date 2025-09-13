@@ -1,15 +1,20 @@
+// This is a hack. I know
 #ifdef _WIN32
-#include <windows.h>
+#include "tinycthread.h"
 #else
-#include <unistd.h>
-#endif
-
 #include <threads.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
+#include "random.h"
 #include "trainer.h"
+#include "utils.h"
+
+#ifdef OPTIMIZER_RUN
+#include <stdio.h>
+#endif
 
 typedef struct Individual
 {
