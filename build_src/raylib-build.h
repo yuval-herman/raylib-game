@@ -28,6 +28,7 @@ bool build_raylib(Nob_Cmd *cmd)
     };
 
     nob_mkdir_if_not_exists(RAYLIB_BUILD);
+    size_t tmp_mark = temp_save();
 
     for (size_t i = 0; i < ARRAY_LEN(header_files); i++)
     {
@@ -95,6 +96,7 @@ bool build_raylib(Nob_Cmd *cmd)
     }
     if (!nob_cmd_run(cmd))
         return false;
+    temp_rewind(tmp_mark);
 
     // optimize library
     cmd_append(cmd, "ranlib", BUILD_DIR RAYLIB_LIB_FILE);

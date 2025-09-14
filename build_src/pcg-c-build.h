@@ -36,6 +36,8 @@ bool build_pcg_c(Nob_Cmd *cmd)
 
     Nob_Procs procs = {0};
     String_Builder sb = {0};
+    size_t tmp_mark = temp_save();
+
     for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
     {
         nob_cmd_append(cmd, "gcc");
@@ -85,6 +87,7 @@ bool build_pcg_c(Nob_Cmd *cmd)
     }
     if (!nob_cmd_run(cmd))
         return false;
+    temp_rewind(tmp_mark);
 
     // optimize library
     cmd_append(cmd, "ranlib", BUILD_DIR PCG_C_LIB_FILE);
