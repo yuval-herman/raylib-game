@@ -139,6 +139,8 @@ int main(void)
 
     // meaningless to put here since the OS will clean this. But this might remind me
     // if I change the logic later and it will be needed. It won't hurt anyway...
+    random_destroy(rng);
+    creature_destroy(&creature);
     b2DestroyWorld(world_id);
     return 0;
 }

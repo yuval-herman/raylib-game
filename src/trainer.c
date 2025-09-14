@@ -558,6 +558,10 @@ int creature_train(Creature *creature)
 #endif
     TraceLog(LOG_DEBUG, "Freeing training resources");
 
+    for (size_t elt_i = 0; elt_i < ELITIST_AMOUNT; elt_i++)
+        genann_free(elitists[elt_i].brain);
+
+    free(fitnesses);
     free_population(population);
     free_population(population_b_gen);
     random_destroy(rng);
