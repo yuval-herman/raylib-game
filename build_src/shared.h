@@ -57,6 +57,8 @@ bool cmd_prep(Cmd *cmd,
     nob_cc_flags(cmd);
     if (move_window)
         cmd_append(cmd, "-DMOVE_WINDOW");
+    // TODO: currently on, should add a flag to disable and also actually disable not activate one thread
+    cmd_append(cmd, "-DENABLE_THREADS=true");
 
     if (debug)
         cmd_append(cmd, "-g", "-O0", "-fsanitize=address,undefined");
