@@ -4,7 +4,9 @@ A tiny C prototype: a Box2D-based "creature" (nodes + joints) rendered with Rayl
 
 ### Preview
 
-<!-- Add a short GIF or link to a video demo here -->
+https://github.com/user-attachments/assets/b6bf24a5-9d9f-48e6-a369-6d4d666ce650
+
+
 
 ### Build
 
