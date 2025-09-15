@@ -92,13 +92,16 @@ b2JointId connect_nodes(b2WorldId world_id, b2BodyId node1, b2BodyId node2, Join
 
     b2Vec2 anchorA = b2Body_GetWorldPoint(node1, b2Vec2_zero);
     b2Vec2 anchorB = b2Body_GetWorldPoint(node2, b2Vec2_zero);
-    // TODO: should use actual radius, or just a more meaningful value
-    joint_def.minLength = default_node_radius;
-    joint_def.maxLength = b2Distance(anchorA, anchorB);
 
-    joint_def.enableSpring = true;
+    const float dist = b2Distance(anchorA, anchorB);
+
+    joint_def.minLength = dist * 0.5;
+    joint_def.length = dist;
+    joint_def.maxLength = dist * 1.5;
+
     joint_def.enableLimit = true;
-    joint_def.enableMotor = true;
+    joint_def.enableSpring = joint_data->is_muscle;
+    joint_def.enableMotor = joint_data->is_muscle;
 
     joint_def.motorSpeed = joint_data->rest_motor_speed;
     joint_def.maxMotorForce = default_motor_force;
@@ -144,8 +147,8 @@ Creature creature_make(RandomState *rng, b2WorldId world_id, b2Vec2 *node_positi
     // Outputs:
     // motor speeds for joints
     double *brain_inputs = malloc(sizeof(double) * inputs);
-    int hidden_layers = 1;
-    int hidden_nodes = inputs * 2;
+    int hidden_layers = 2;
+    int hidden_nodes = inputs * 3;
     int outputs = joint_amount;
     genann *ann = genann_init(rng, inputs,
                               hidden_layers,
@@ -272,9 +275,9 @@ void creature_think(Creature *creature, CreatureInstruction inst)
     inputs += creature->node_amount * 2;
     inputs[0] = center.y;
 
-    inputs[1] = inst == INST_LEFT;
-    inputs[2] = inst == INST_RIGHT;
-    inputs[3] = inst == INST_NONE;
+    inputs[1] = inst == INST_LEFT ? 1 : -1;
+    inputs[2] = inst == INST_RIGHT ? 1 : -1;
+    inputs[3] = inst == INST_NONE ? 1 : -1;
 
     const double *motor_speeds = genann_run(creature->brain, creature->brain_inputs);
     for (size_t i = 0; i < creature->joint_amount; i++)
@@ -284,8 +287,12 @@ void creature_think(Creature *creature, CreatureInstruction inst)
     }
 }
 
-void creature_update(Creature *creature)
+void creature_update(Creature *creature, RandomState *rng)
 {
+    if (IsKeyPressed(KEY_Q))
+    {
+        creature_rotate(creature, creature_get_center(creature), random_float(rng) * 2 * B2_PI);
+    }
     if (IsKeyPressed(KEY_R))
     {
         creature_reset(creature);

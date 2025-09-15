@@ -67,12 +67,12 @@ int main(void)
     // #==============================================================
     b2Vec2 node_pos[] = {{1, 7.5}, {5, 0}, {9, 7.5}, {5, 3.25}};
     JointData joints[] = {
-        {0, 1, 0},
-        {1, 2, 0},
-        {2, 0, 0},
-        {3, 1, 0},
-        {3, 2, 0},
-        {3, 0, 0},
+        {false, 0, 1, 0},
+        {false, 1, 2, 0},
+        {false, 2, 0, 0},
+        {true, 3, 1, 0},
+        {true, 3, 2, 0},
+        {true, 3, 0, 0},
     };
     Creature creature = creature_make(rng, world_id, node_pos, ARRAY_COUNT(node_pos), joints, ARRAY_COUNT(joints));
 #ifdef OPTIMIZER_RUN
@@ -128,7 +128,7 @@ int main(void)
         b2World_Step(world_id, TIME_STEP, SUB_STEP_COUNT);
 
         DrawRectanglePro(groundBoxRect, groundBoxRectOrigin, 0, BLACK);
-        creature_update(&creature);
+        creature_update(&creature, rng);
         creature_draw(creature);
 
         EndMode2D();

@@ -13,6 +13,7 @@
 
 typedef struct JointData
 {
+    bool is_muscle;
     unsigned int node_a_idx;
     unsigned int node_b_idx;
     float rest_motor_speed;
@@ -53,7 +54,7 @@ void creature_reset(Creature *creature);
 // Creature is emptied and can be safely reused after a call to this function
 void creature_destroy(Creature *creature);
 void creature_draw(Creature creature);
-void creature_update(Creature *creature);
+void creature_update(Creature *creature, RandomState *rng);
 void creature_think(Creature *creature, CreatureInstruction);
 b2Vec2 creature_get_center(const Creature *creature);
 void creature_rotate(Creature *creature, b2Vec2 origin, float rad);
