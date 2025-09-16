@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "../flag.h"
+
 #define SRC_DIR "src/"
 #define BUILD_DIR "build/"
 #define INCLUDE_DIR BUILD_DIR "include/"
@@ -51,12 +53,17 @@
 bool cmd_prep(Cmd *cmd,
               bool move_window,
               bool debug,
-              bool optimize)
+              bool optimize,
+              Flag_List custom_defines)
 {
     nob_cc(cmd);
     nob_cc_flags(cmd);
     if (move_window)
         cmd_append(cmd, "-DMOVE_WINDOW");
+    for (size_t i = 0; i < custom_defines.count; i++)
+    {
+        cmd_append(cmd, temp_sprintf("-D%s", custom_defines.items[i]));
+    }
     // TODO: currently on, should add a flag to disable and also actually disable not activate one thread
     cmd_append(cmd, "-DENABLE_THREADS=true");
 
@@ -86,9 +93,10 @@ bool cmd_prep(Cmd *cmd,
 bool compile_program(Cmd *cmd,
                      bool move_window,
                      bool debug,
-                     bool optimize)
+                     bool optimize,
+                     Flag_List custom_defines)
 {
-    cmd_prep(cmd, move_window, debug, optimize);
+    cmd_prep(cmd, move_window, debug, optimize, custom_defines);
     if (!cmd_run(cmd))
         return false;
     return true;

@@ -97,6 +97,7 @@ int main(int argc, char **argv)
     bool *debug = flag_bool("debug", false, "Compile with debug symbols");
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
+    Flag_List *custom_defines = flag_list("define", "Define a symbol for the preprocessor, passed directly to the compiler");
     // bool *run_optimizer = flag_bool("run_optimizer", false, "Instead of building the program normally, this will run an optimizer on the values defined in trainer.h and report back findings");
     // char **target = flag_str("target", DEFAULT_TARGET, "Compilation target (windows/linux)");
 
@@ -122,6 +123,17 @@ int main(int argc, char **argv)
     nob_log(INFO, "\t\t%-15s:\t%5s", "force", FLAG_SET(*force));
     // nob_log(INFO, "\t\t%-15s:\t%5s", "run_optimizer", FLAG_SET(*run_optimizer));
     nob_log(INFO, "==================================");
+
+    if (custom_defines->count > 0)
+    {
+        nob_log(INFO, "Custom definitions:");
+        nob_log(INFO, "==================================");
+        for (size_t i = 0; i < custom_defines->count; i++)
+        {
+            nob_log(INFO, "\t\t%s", custom_defines->items[i]);
+        }
+        nob_log(INFO, "==================================");
+    }
 
     if (!build_libs())
         return 1;
@@ -218,7 +230,7 @@ int main(int argc, char **argv)
     // TODO detect flag changes, such as move_window, as also requiring a rebuild
     if (!read_dir_success || *force || nob_needs_rebuild(OUTPUT_FILE, src_files.items, src_files.count))
     {
-        if (!compile_program(&cmd, *move_window, *debug, *optimize))
+        if (!compile_program(&cmd, *move_window, *debug, *optimize, *custom_defines))
             return 1;
     }
     else
