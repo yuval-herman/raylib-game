@@ -230,12 +230,12 @@ static void copy_weights(const genann *src, genann *dst)
     memcpy(dst->weight, src->weight, sizeof(double) * src->total_weights);
 }
 
-double crossover_abort_chance(int generation)
-{
-    const double target_rate = CROSSOVER_ABORT_MAX;
-    const double min_rate = CROSSOVER_ABORT_MIN;
-    return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
-}
+// static inline double crossover_abort_chance(int generation)
+// {
+//     const double target_rate = CROSSOVER_ABORT_MAX;
+//     const double min_rate = CROSSOVER_ABORT_MIN;
+//     return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
+// }
 
 int get_tournament_size(float trend)
 {
@@ -463,9 +463,10 @@ int creature_train(Creature *creature)
     genann *population_b_gen = init_population(rng, creature);
     float *fitnesses = malloc(sizeof fitnesses[0] * POP_SIZE);
     TrainingStats stats = make_training_stats();
-    double crss_abort_chance;
+    // double crss_abort_chance;
 
     const int cores = n_cores();
+TraceLog(LOG_DEBUG, "running on %d threads", cores);
     assert(cores > 0);
 
     // These are passed by pointer to individual threads for synchronization
@@ -497,14 +498,14 @@ int creature_train(Creature *creature)
 
     for (int generation = 0; generation < EVOLUTION_GENERATIONS; generation++)
     {
-        crss_abort_chance = crossover_abort_chance(generation);
-        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f, trend: %+8.3f], crossover_abort_chance: [%.3f], tournament_size: [%3d/%3d], mutation_rate: [%.3f], evaluation_penalty: [%.3f]",
+// crss_abort_chance = crossover_abort_chance(generation);
+        TraceLog(LOG_INFO, "%3d generation, fitness: [max: %+8.3f, avg: %+8.3f, min: %+8.3f, trend: %+8.3f], tournament_size: [%3d/%3d], mutation_rate: [%.3f], evaluation_penalty: [%.3f]",
                  generation,
                  stats.max_fit,
                  stats.avg_fit,
                  stats.min_fit,
                  stats.fit_trend,
-                 crss_abort_chance,
+//  crss_abort_chance,
                  get_tournament_size(stats.fit_trend),
                  POP_SIZE,
                  get_mutation_rate(stats.fit_trend),
