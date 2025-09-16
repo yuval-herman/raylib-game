@@ -237,22 +237,22 @@ static void copy_weights(const genann *src, genann *dst)
 //     return b2MaxFloat(min_rate, ((double)generation * target_rate) / EVOLUTION_GENERATIONS);
 // }
 
-int get_tournament_size(float trend)
+static inline int get_tournament_size(float trend)
 {
     int base = BASE_TOURNAMENT_SIZE * 0.5f;
-    float norm_t = ((trend / 10) * POP_SIZE);
+    float norm_t = ((trend / 100) * POP_SIZE);
     int ret = trend < 0 ? b2MinInt(POP_SIZE, base - norm_t) : b2MaxInt(1, (int)(base - norm_t));
     return ret;
 }
 
-double get_mutation_rate(float trend)
+static inline double get_mutation_rate(float trend)
 {
     double base = BASE_MUTATION_RATE;
     double ret = base / (fabsf(trend / 10) + 1);
     return ret;
 }
 
-float get_evaluation_penalty(int generation)
+static inline float get_evaluation_penalty(int generation)
 {
     float mul = (MAX_EVALUATION_PENALTY - MIN_EVALUATION_PENALTY) / END_EVALUATION_PENALTY_GENERATION;
     return b2MinFloat(MAX_EVALUATION_PENALTY, MIN_EVALUATION_PENALTY + generation * mul);
