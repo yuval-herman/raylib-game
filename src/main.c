@@ -65,7 +65,8 @@ int main(void)
     // #==============================================================
     //                     CREATURE INITIALIZATION
     // #==============================================================
-    b2Vec2 node_pos[] = {{1, 7.5}, {5, 0}, {9, 7.5}, {5, 3.25}};
+    b2Vec2 node_pos[] = {{1, 1}, {5, 7.5}, {9, 1}, {5, 3.25}};
+
     JointData joints[] = {
         {false, 0, 1, 0},
         {false, 1, 2, 0},
@@ -121,17 +122,19 @@ int main(void)
 
     while (!WindowShouldClose())
     {
-        BeginDrawing();
-
-        ClearBackground(RAYWHITE);
-        BeginMode2D(camera);
         b2World_Step(world_id, TIME_STEP, SUB_STEP_COUNT);
-
-        DrawRectanglePro(groundBoxRect, groundBoxRectOrigin, 0, BLACK);
         creature_update(&creature, rng);
-        creature_draw(creature);
 
-        EndMode2D();
+        BeginDrawing();
+        {
+            ClearBackground(RAYWHITE);
+            BeginMode2D(camera);
+            {
+                DrawRectanglePro(groundBoxRect, groundBoxRectOrigin, 0, BLACK);
+                creature_draw(creature);
+            }
+            EndMode2D();
+        }
         EndDrawing();
     }
 
