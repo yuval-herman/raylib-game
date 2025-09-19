@@ -51,7 +51,7 @@ bool build_box2d(Nob_Cmd *cmd)
     if (!nob_copy_directory_recursively(BOX2D_INCLUDE "box2d", INCLUDE_DIR))
         return false;
     Nob_Procs procs = {0};
-    size_t tmp_mark = temp_save();
+    size_t tmp_mark = nob_temp_save();
     for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
     {
         nob_cmd_append(cmd, "gcc");
@@ -82,12 +82,12 @@ bool build_box2d(Nob_Cmd *cmd)
     if (!nob_cmd_run(cmd))
         return false;
 
-    temp_rewind(tmp_mark);
+    nob_temp_rewind(tmp_mark);
     // optimize library
-    cmd_append(cmd, "ranlib", BUILD_DIR BOX2D_LIB_FILE);
+    nob_cmd_append(cmd, "ranlib", BUILD_DIR BOX2D_LIB_FILE);
     if (!nob_cmd_run(cmd))
     {
-        nob_log(WARNING, "failed optimizing library");
+        nob_log(NOB_WARNING, "failed optimizing library");
     }
     return true;
 }
