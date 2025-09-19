@@ -64,8 +64,11 @@ bool cmd_prep(Cmd *cmd,
     {
         cmd_append(cmd, temp_sprintf("-D%s", custom_defines.items[i]));
     }
-    // TODO: currently on, should add a flag to disable and also actually disable not activate one thread
-    cmd_append(cmd, "-DENABLE_THREADS=true");
+    if (!debug)
+    {
+        // TODO: currently on, should add a flag to disable and also actually disable not activate one thread
+        cmd_append(cmd, "-DENABLE_THREADS=true");
+    }
 
     if (debug)
         cmd_append(cmd, "-g", "-O0", "-fsanitize=address,undefined");
