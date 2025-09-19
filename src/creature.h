@@ -5,6 +5,8 @@
 
 #include "physics.h"
 #include "random.h"
+
+#define genann_act genann_act_threshold
 #include "genann.h"
 
 // TODO: should assert on these in code
