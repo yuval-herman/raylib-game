@@ -41,6 +41,7 @@ typedef struct BuildFlags
     const bool debug;
     const bool optimize;
     const bool force;
+    const bool disable_threads;
     const Flag_List custom_defines;
 } BuildFlags;
 
@@ -80,6 +81,7 @@ BuildFlags parse_flags(int argc, char **argv)
     bool *debug = flag_bool("debug", false, "Compile with debug symbols");
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
+    bool *disable_threads = flag_bool("disable_threads", false, "Disables multithreading in compiled program");
     Flag_List *custom_defines = flag_list("define", "Define a symbol for the preprocessor, passed directly to the compiler");
 
     if (!flag_parse(argc, argv))
@@ -94,6 +96,7 @@ BuildFlags parse_flags(int argc, char **argv)
         .debug = *debug,
         .optimize = *optimize,
         .force = *force,
+        .disable_threads = *disable_threads,
         .custom_defines = *custom_defines,
     };
 }
@@ -154,9 +157,8 @@ bool compile_main(const BuildFlags flags)
     {
         nob_cmd_append(&cmd, nob_temp_sprintf("-D%s", flags.custom_defines.items[i]));
     }
-    if (!flags.debug)
+    if (!flags.disable_threads)
     {
-        // TODO: currently on, should add a flag to disable and also actually disable not activate one thread
         nob_cmd_append(&cmd, "-DENABLE_THREADS=true");
     }
 
