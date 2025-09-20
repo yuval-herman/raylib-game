@@ -17,7 +17,3 @@
 ### File/Folder structure
 
 - Two external folders are confusing. Either compile them as libraries as well or rename one of the folders
-
-### Build system
-
-- The build system is a bit messy. No need to rewrite from scratch, but there is a need to extract reused functionality, clean macros and tidy up a bit
