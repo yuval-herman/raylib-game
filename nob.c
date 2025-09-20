@@ -2,6 +2,7 @@
 #include "build_src/box2d-build.h"
 #include "build_src/raylib-build.h"
 #include "build_src/pcg-c-build.h"
+#include "build_src/lib-build.h"
 
 #define NOB_EXPERIMENTAL_DELETE_OLD
 #include "build_src/shared.h"
@@ -15,21 +16,22 @@
 
 #define BOOL2STR(flag) flag ? "set" : "unset"
 
-#define build_lib(lib_name, lib_file_name, build_func)                             \
-    do                                                                             \
-    {                                                                              \
-        if (!nob_file_exists(BUILD_DIR lib_file_name))                             \
-        {                                                                          \
-            if (!build_func(&cmd))                                                 \
-            {                                                                      \
-                nob_log(NOB_ERROR, lib_name " build failed");                      \
-                return false;                                                      \
-            }                                                                      \
-        }                                                                          \
-        else                                                                       \
-        {                                                                          \
-            nob_log(NOB_INFO, lib_file_name " found, skiping " lib_name " build"); \
-        }                                                                          \
+#define try_lib_build(lib_name, lib_data)                            \
+    do                                                               \
+    {                                                                \
+        if (!nob_file_exists(BUILD_DIR "lib" lib_name ".a"))         \
+        {                                                            \
+            if (!build_lib(&cmd, lib_data))                          \
+            {                                                        \
+                nob_log(NOB_ERROR, lib_name " build failed");        \
+                return false;                                        \
+            }                                                        \
+        }                                                            \
+        else                                                         \
+        {                                                            \
+            nob_log(NOB_INFO, "lib" lib_name ".a"                    \
+                              " found, skiping " lib_name " build"); \
+        }                                                            \
     } while (0);
 
 typedef struct BuildFlags
@@ -61,9 +63,9 @@ bool build_libs()
         return false;
     }
 
-    build_lib(BOX2D_LIB, BOX2D_LIB_FILE, build_box2d);
-    build_lib(RAYLIB_LIB, RAYLIB_LIB_FILE, build_raylib);
-    build_lib(PCG_C_LIB, PCG_C_LIB_FILE, build_pcg_c);
+    try_lib_build(BOX2D_LIB, box2d_data);
+    try_lib_build(RAYLIB_LIB, raylib_data);
+    try_lib_build(PCG_C_LIB, pcg_c_data);
 
     print_separator(NOB_INFO);
     return true;
@@ -120,7 +122,7 @@ void print_set_flags(const BuildFlags flags)
 
 bool is_exec_stale()
 {
-    // TODO detect flag changes, such as move_window, as also requiring a rebuild
+    // TODO detect flag changes, such as -optimize, as also requiring a rebuild
 
     Nob_File_Paths no_path_files = {0};
     Nob_File_Paths src_files = {0};
@@ -199,6 +201,7 @@ int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF_PLUS(argc, argv,
                                "build_src/shared.h",
+                               "build_src/lib-build.h",
                                "build_src/box2d-build.h",
                                "build_src/raylib-build.h",
                                "build_src/pcg-c-build.h");

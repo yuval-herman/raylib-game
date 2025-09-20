@@ -1,93 +1,58 @@
 #include "shared.h"
 
-#define BOX2D_DIR "external/box2d/"
-#define BOX2D_SRC BOX2D_DIR "src/"
-#define BOX2D_INCLUDE BOX2D_DIR "include/"
+LibData box2d_data = {
+    .name = BOX2D_LIB,
+    .src_files = (const char *[34]){
+        "external/box2d/src/aabb.c",
+        "external/box2d/src/arena_allocator.c",
+        "external/box2d/src/array.c",
+        "external/box2d/src/bitset.c",
+        "external/box2d/src/body.c",
+        "external/box2d/src/broad_phase.c",
+        "external/box2d/src/constraint_graph.c",
+        "external/box2d/src/contact.c",
+        "external/box2d/src/contact_solver.c",
+        "external/box2d/src/core.c",
+        "external/box2d/src/distance.c",
+        "external/box2d/src/distance_joint.c",
+        "external/box2d/src/dynamic_tree.c",
+        "external/box2d/src/geometry.c",
+        "external/box2d/src/hull.c",
+        "external/box2d/src/id_pool.c",
+        "external/box2d/src/island.c",
+        "external/box2d/src/joint.c",
+        "external/box2d/src/manifold.c",
+        "external/box2d/src/math_functions.c",
+        "external/box2d/src/motor_joint.c",
+        "external/box2d/src/mover.c",
+        "external/box2d/src/physics_world.c",
+        "external/box2d/src/prismatic_joint.c",
+        "external/box2d/src/revolute_joint.c",
+        "external/box2d/src/sensor.c",
+        "external/box2d/src/shape.c",
+        "external/box2d/src/solver.c",
+        "external/box2d/src/solver_set.c",
+        "external/box2d/src/table.c",
+        "external/box2d/src/timer.c",
+        "external/box2d/src/types.c",
+        "external/box2d/src/weld_joint.c",
+        "external/box2d/src/wheel_joint.c",
+    },
+    .src_files_count = 34,
 
-#define BOX2D_BUILD BUILD_DIR "box2d/"
+    .header_files = (const char *[6]){
+        "external/box2d/include/box2d/base.h",
+        "external/box2d/include/box2d/box2d.h",
+        "external/box2d/include/box2d/collision.h",
+        "external/box2d/include/box2d/id.h",
+        "external/box2d/include/box2d/math_functions.h",
+        "external/box2d/include/box2d/types.h",
+    },
+    .header_files_count = 6,
 
-#define BOX2D_OPTIMIZE_FLAGS(cmd) nob_cmd_append(cmd, "-O3", "-DNDEBUG")
+    .include_dirs = (const char *[1]){"external/box2d/include"},
+    .include_dirs_count = 1,
 
-bool build_box2d(Nob_Cmd *cmd)
-{
-    const char *src_files[] = {
-        "aabb.c",
-        "arena_allocator.c",
-        "array.c",
-        "bitset.c",
-        "body.c",
-        "broad_phase.c",
-        "constraint_graph.c",
-        "contact.c",
-        "contact_solver.c",
-        "core.c",
-        "distance.c",
-        "distance_joint.c",
-        "dynamic_tree.c",
-        "geometry.c",
-        "hull.c",
-        "id_pool.c",
-        "island.c",
-        "joint.c",
-        "manifold.c",
-        "math_functions.c",
-        "motor_joint.c",
-        "mover.c",
-        "physics_world.c",
-        "prismatic_joint.c",
-        "revolute_joint.c",
-        "sensor.c",
-        "shape.c",
-        "solver.c",
-        "solver_set.c",
-        "table.c",
-        "timer.c",
-        "types.c",
-        "weld_joint.c",
-        "wheel_joint.c",
-    };
-    if (!nob_mkdir_if_not_exists(BOX2D_BUILD))
-        return false;
-    if (!nob_copy_directory_recursively(BOX2D_INCLUDE "box2d", INCLUDE_DIR))
-        return false;
-    Nob_Procs procs = {0};
-    size_t tmp_mark = nob_temp_save();
-    for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
-    {
-        nob_cmd_append(cmd, "gcc");
-        nob_cmd_append(cmd, "-I" BOX2D_SRC);
-        nob_cmd_append(cmd, "-I" BOX2D_INCLUDE);
-
-        nob_cmd_append(cmd, "-DBOX2D_VALIDATE", "-std=gnu17", "-fvisibility=hidden", "-ffp-contract=off", "-pedantic");
-        // TODO: build 2 versions (or more), one for debug, one for speed (optmize)
-        BOX2D_OPTIMIZE_FLAGS(cmd);
-
-        nob_cmd_append(cmd, "-o");
-        nob_cmd_append(cmd, nob_temp_sprintf("%s%s.o", BOX2D_BUILD, src_files[i]));
-
-        nob_cmd_append(cmd, "-c");
-        nob_cmd_append(cmd, nob_temp_sprintf("%s%s", BOX2D_SRC, src_files[i]));
-
-        if (!nob_cmd_run(cmd, .async = &procs))
-            return false;
-    }
-    if (!nob_procs_flush(&procs))
-        return false;
-
-    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR BOX2D_LIB_FILE);
-    for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
-    {
-        nob_cmd_append(cmd, nob_temp_sprintf("%s%s.o", BOX2D_BUILD, src_files[i]));
-    }
-    if (!nob_cmd_run(cmd))
-        return false;
-
-    nob_temp_rewind(tmp_mark);
-    // optimize library
-    nob_cmd_append(cmd, "ranlib", BUILD_DIR BOX2D_LIB_FILE);
-    if (!nob_cmd_run(cmd))
-    {
-        nob_log(NOB_WARNING, "failed optimizing library");
-    }
-    return true;
-}
+    .custom_flags = (const char *[2]){"-O3", "-DNDEBUG"},
+    .custom_flags_count = 2,
+};

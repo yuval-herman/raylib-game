@@ -1,100 +1,36 @@
 #include "shared.h"
 
-#define PCG_C_DIR "external/pcg-c/"
-#define PCG_C_SRC PCG_C_DIR "src/"
-#define PCG_C_INCLUDE PCG_C_DIR "include/"
+LibData pcg_c_data = {
+    .name = PCG_C_LIB,
+    .src_files = (const char *[17]){
+        "external/pcg-c/src/pcg-advance-8.c",
+        "external/pcg-c/src/pcg-advance-16.c",
+        "external/pcg-c/src/pcg-advance-32.c",
+        "external/pcg-c/src/pcg-advance-64.c",
+        "external/pcg-c/src/pcg-advance-128.c",
+        "external/pcg-c/src/pcg-output-8.c",
+        "external/pcg-c/src/pcg-output-16.c",
+        "external/pcg-c/src/pcg-output-32.c",
+        "external/pcg-c/src/pcg-output-64.c",
+        "external/pcg-c/src/pcg-output-128.c",
+        "external/pcg-c/src/pcg-rngs-8.c",
+        "external/pcg-c/src/pcg-rngs-16.c",
+        "external/pcg-c/src/pcg-rngs-32.c",
+        "external/pcg-c/src/pcg-rngs-64.c",
+        "external/pcg-c/src/pcg-rngs-128.c",
+        "external/pcg-c/src/pcg-global-32.c",
+        "external/pcg-c/src/pcg-global-64.c",
+    },
+    .src_files_count = 17,
 
-#define PCG_C_BUILD BUILD_DIR "pcg_c/"
+    .header_files = (const char *[1]){
+        "external/pcg-c/include/pcg_variants.h",
+    },
+    .header_files_count = 1,
 
-#define PCG_C_OPTIMIZE_FLAGS(cmd) nob_cmd_append(cmd, "-O3")
+    .include_dirs = (const char *[1]){"external/pcg-c/include"},
+    .include_dirs_count = 1,
 
-bool build_pcg_c(Nob_Cmd *cmd)
-{
-
-    const char *src_files[] = {
-        "pcg-advance-8.c",
-        "pcg-advance-16.c",
-        "pcg-advance-32.c",
-        "pcg-advance-64.c",
-        "pcg-advance-128.c",
-        "pcg-output-8.c",
-        "pcg-output-16.c",
-        "pcg-output-32.c",
-        "pcg-output-64.c",
-        "pcg-output-128.c",
-        "pcg-rngs-8.c",
-        "pcg-rngs-16.c",
-        "pcg-rngs-32.c",
-        "pcg-rngs-64.c",
-        "pcg-rngs-128.c",
-        "pcg-global-32.c",
-        "pcg-global-64.c",
-    };
-    nob_mkdir_if_not_exists(PCG_C_BUILD);
-    if (!nob_copy_directory_recursively(PCG_C_INCLUDE, INCLUDE_DIR))
-        return false;
-
-    Nob_Procs procs = {0};
-    Nob_String_Builder sb = {0};
-    size_t tmp_mark = nob_temp_save();
-
-    for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
-    {
-        nob_cmd_append(cmd, "gcc");
-
-        sb.count = 0;
-        // setoutput dir and replace '.c' with '.o' in file name
-        nob_sb_append_cstr(&sb, PCG_C_BUILD);
-        nob_sb_append_buf(&sb, src_files[i], strlen(src_files[i]) - 2);
-        nob_sb_append_cstr(&sb, ".o");
-        nob_sb_append_null(&sb);
-
-        nob_cmd_append(cmd, "-o");
-        nob_cmd_append(cmd, nob_temp_strdup(sb.items));
-
-        nob_cmd_append(cmd, "-c");
-
-        sb.count = 0;
-        nob_sb_append_cstr(&sb, PCG_C_SRC);
-        nob_sb_append_cstr(&sb, src_files[i]);
-        nob_sb_append_null(&sb);
-
-        nob_cmd_append(cmd, nob_temp_strdup(sb.items));
-
-        nob_cmd_append(cmd, "-std=c99");
-        // TODO: build 2 versions (or more), one for debug, one for speed (optmize)
-        PCG_C_OPTIMIZE_FLAGS(cmd);
-
-        nob_cmd_append(cmd, "-I./" PCG_C_INCLUDE);
-
-        if (!nob_cmd_run(cmd, .async = &procs))
-            return false;
-    }
-    if (!nob_procs_flush(&procs))
-        return false;
-
-    nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR PCG_C_LIB_FILE);
-    for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); i++)
-    {
-        sb.count = 0;
-        // setoutput dir and replace '.c' with '.o' in file name
-        nob_sb_append_cstr(&sb, PCG_C_BUILD);
-        nob_sb_append_buf(&sb, src_files[i], strlen(src_files[i]) - 2);
-        nob_sb_append_cstr(&sb, ".o");
-        nob_sb_append_null(&sb);
-
-        nob_cmd_append(cmd, nob_temp_strdup(sb.items));
-    }
-    if (!nob_cmd_run(cmd))
-        return false;
-    nob_temp_rewind(tmp_mark);
-
-    // optimize library
-    nob_cmd_append(cmd, "ranlib", BUILD_DIR PCG_C_LIB_FILE);
-    if (!nob_cmd_run(cmd))
-    {
-        nob_log(NOB_WARNING, "failed optimizing library");
-    }
-
-    return true;
-}
+    .custom_flags = (const char *[1]){"-O3"},
+    .custom_flags_count = 1,
+};
