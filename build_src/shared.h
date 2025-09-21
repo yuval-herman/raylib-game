@@ -13,8 +13,10 @@
 
 #ifdef _WIN32
 #define OUTPUT_FILE BUILD_DIR "main.exe"
+#define TESTS_OUTPUT_FILE BUILD_DIR "tests.exe"
 #else
 #define OUTPUT_FILE BUILD_DIR "main"
+#define TESTS_OUTPUT_FILE BUILD_DIR "tests"
 #endif
 
 #define BOX2D_LIB "box2d"

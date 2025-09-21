@@ -21,12 +21,6 @@
 
 # Practical steps
 
-1. Make a unit testing framework.
-
-   - Start testing core functions.
-   - Add test runner to nob.
-   - Add background test runner.
-
 2. Rewrite Creature
 
    - Focus on DOD design goal.

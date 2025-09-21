@@ -42,56 +42,48 @@
         }                                                            \
     } while (0);
 
+typedef enum NobSubcommand
+{
+    SUB_RUN,
+    SUB_TEST,
+    SUB_COMPILE,
+} NobSubcommand;
+
 typedef struct BuildFlags
 {
     const bool help;
-    const bool run;
     const bool debug;
     const bool optimize;
     const bool force;
     const bool disable_threads;
     const Flag_List custom_defines;
+    const NobSubcommand sub_command;
 } BuildFlags;
 
 Nob_Cmd cmd = {0};
 
 void usage(FILE *stream)
 {
-    fprintf(stream, "Usage: ./nob [OPTIONS]\n");
-    fprintf(stream, "OPTIONS:\n");
+    fprintf(stream, "Usage: ./nob [...OPTIONS] [subcommand]\n");
+    fprintf(stream, "\nAvailable subcommands are:\n");
+    fprintf(stream, "\tcompile (default) - builds the project.\n");
+    fprintf(stream, "\trun               - builds the project (if necessary) and runs the output executable.\n");
+    fprintf(stream, "\ttest              - builds the test runner and run it.\n");
+    fprintf(stream, "\nOPTIONS:\n");
     flag_print_options(stream);
-}
-
-bool build_libs()
-{
-    nob_log(NOB_INFO, "Building libraries");
-    print_separator(NOB_INFO);
-    if (!nob_mkdir_if_not_exists(BUILD_DIR) || !nob_mkdir_if_not_exists(INCLUDE_DIR))
-    {
-        nob_log(NOB_ERROR, "failed creating build directory");
-        return false;
-    }
-
-    try_lib_build(BOX2D_LIB, box2d_data);
-    try_lib_build(RAYLIB_LIB, raylib_data);
-    try_lib_build(PCG_C_LIB, pcg_c_data);
-    try_lib_build(TINYCTHREADS_LIB, tinycthreads_data);
-
-    print_separator(NOB_INFO);
-    return true;
 }
 
 // This function exits on error
 BuildFlags parse_flags(int argc, char **argv)
 {
     bool *help = flag_bool("help", false, "Print this help to stdout and exit with 0");
-    bool *run = flag_bool("run", false, "Run main after compilation");
     bool *move_window = flag_bool("move_window", false, "Make the game window appear in the top-right corner of the screen. This is helpful for development.");
     bool *debug = flag_bool("debug", false, "Compile with debug symbols");
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
     bool *disable_threads = flag_bool("disable_threads", false, "Disables multithreading in compiled program");
     Flag_List *custom_defines = flag_list("define", "Define a symbol for the preprocessor, passed directly to the compiler");
+    NobSubcommand sub_command = SUB_COMPILE;
 
     if (!flag_parse(argc, argv))
     {
@@ -99,14 +91,32 @@ BuildFlags parse_flags(int argc, char **argv)
         flag_print_error(stderr);
         exit(1);
     }
+
+    if (flag_rest_argc() > 0)
+    {
+        const char *command_str = flag_rest_argv()[0];
+        if (strcmp(command_str, "compile") == 0)
+            sub_command = SUB_COMPILE;
+        else if (strcmp(command_str, "run") == 0)
+            sub_command = SUB_RUN;
+        else if (strcmp(command_str, "test") == 0)
+            sub_command = SUB_TEST;
+        else
+        {
+            usage(stderr);
+            fprintf(stderr, "ERROR: %s: unknown sub command\n", command_str);
+            exit(1);
+        }
+    }
+
     return (BuildFlags){
         .help = *help,
-        .run = *run,
         .debug = *debug,
         .optimize = *optimize,
         .force = *force,
         .disable_threads = *disable_threads,
         .custom_defines = *custom_defines,
+        .sub_command = sub_command,
     };
 }
 
@@ -157,6 +167,25 @@ bool is_exec_stale()
     return !read_dir_success || nob_needs_rebuild(OUTPUT_FILE, src_files.items, src_files.count);
 }
 
+bool build_libs()
+{
+    nob_log(NOB_INFO, "Building libraries");
+    print_separator(NOB_INFO);
+    if (!nob_mkdir_if_not_exists(BUILD_DIR) || !nob_mkdir_if_not_exists(INCLUDE_DIR))
+    {
+        nob_log(NOB_ERROR, "failed creating build directory");
+        return false;
+    }
+
+    try_lib_build(BOX2D_LIB, box2d_data);
+    try_lib_build(RAYLIB_LIB, raylib_data);
+    try_lib_build(PCG_C_LIB, pcg_c_data);
+    try_lib_build(TINYCTHREADS_LIB, tinycthreads_data);
+
+    print_separator(NOB_INFO);
+    return true;
+}
+
 bool compile_main(const BuildFlags flags)
 {
     nob_cc(&cmd);
@@ -196,10 +225,22 @@ bool compile_main(const BuildFlags flags)
     nob_cmd_append(&cmd, "-lopengl32", "-lgdi32", "-lwinmm", "-lshell32");
 #endif
 
-    if (!nob_cmd_run(&cmd))
-        return false;
+    return nob_cmd_run(&cmd);
+}
 
-    return true;
+bool compile_test_runner()
+{
+    nob_cc(&cmd);
+    nob_cmd_append(&cmd, "-Wall", "-Wextra", "-Wswitch-enum");
+
+    nob_cmd_append(&cmd, "-g", "-O0", "-fsanitize=address,undefined");
+
+    nob_cmd_append(&cmd, "-I./tests");
+
+    nob_cc_output(&cmd, TESTS_OUTPUT_FILE);
+    nob_cc_inputs(&cmd, "tests/test-runner.c");
+
+    return nob_cmd_run(&cmd);
 }
 
 int main(int argc, char **argv)
@@ -218,20 +259,30 @@ int main(int argc, char **argv)
 
     if (!build_libs())
         return 1;
+    if (b_flags.sub_command == SUB_COMPILE || b_flags.sub_command == SUB_RUN)
+    {
+        if (b_flags.force || is_exec_stale())
+        {
+            if (!compile_main(b_flags))
+                return 1;
+        }
+        else
+        {
+            nob_log(NOB_INFO, "No rebuild needed");
+        }
 
-    if (b_flags.force || is_exec_stale())
-    {
-        if (!compile_main(b_flags))
-            return 1;
-    }
-    else
-    {
-        nob_log(NOB_INFO, "No rebuild needed");
+        if (b_flags.sub_command == SUB_RUN)
+        {
+            nob_cmd_append(&cmd, "./" OUTPUT_FILE);
+            if (!nob_cmd_run(&cmd))
+                return 1;
+        }
     }
 
-    if (b_flags.run)
+    if (b_flags.sub_command == SUB_TEST)
     {
-        nob_cmd_append(&cmd, "./" OUTPUT_FILE);
+        compile_test_runner();
+        nob_cmd_append(&cmd, "./" TESTS_OUTPUT_FILE);
         if (!nob_cmd_run(&cmd))
             return 1;
     }
