@@ -1,4 +1,4 @@
-#include "shared.h"
+#include "../shared.h"
 
 LibData box2d_data = {
     .name = BOX2D_LIB,

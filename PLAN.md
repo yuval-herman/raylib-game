@@ -13,7 +13,3 @@
 ### Data oriented design
 
 - It's best to start designing things to work with DOD now, rather then later
-
-### File/Folder structure
-
-- Two external folders are confusing. Either compile them as libraries as well or rename one of the folders

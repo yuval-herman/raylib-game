@@ -20,10 +20,10 @@
 #define BOX2D_LIB "box2d"
 #define RAYLIB_LIB "raylib"
 #define PCG_C_LIB "pcg_random"
+#define TINYCTHREADS_LIB "tinycthreads"
+#define GENANN_LIB "genann"
 
-#define BOX2D_LIB_FILE "lib" BOX2D_LIB ".a"
-#define RAYLIB_LIB_FILE "lib" RAYLIB_LIB ".a"
-#define PCG_C_LIB_FILE "lib" PCG_C_LIB ".a"
+#define lib_file_name(libname) "lib" libname ".a"
 
 #define print_separator(level) nob_log(level, "==================================")
 

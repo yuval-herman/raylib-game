@@ -1,4 +1,4 @@
-#include "shared.h"
+#include "../shared.h"
 
 LibData pcg_c_data = {
     .name = PCG_C_LIB,

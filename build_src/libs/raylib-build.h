@@ -1,4 +1,4 @@
-#include "shared.h"
+#include "../shared.h"
 
 LibData raylib_data = {
     .name = RAYLIB_LIB,

@@ -1,7 +1,8 @@
 
-#include "build_src/box2d-build.h"
-#include "build_src/raylib-build.h"
-#include "build_src/pcg-c-build.h"
+#include "build_src/libs/box2d-build.h"
+#include "build_src/libs/raylib-build.h"
+#include "build_src/libs/pcg-c-build.h"
+#include "build_src/libs/tinycthreads-build.h"
 #include "build_src/lib-build.h"
 
 #define NOB_EXPERIMENTAL_DELETE_OLD
@@ -13,6 +14,13 @@
 #define FLAG_IMPLEMENTATION
 #define FLAG_PUSH_DASH_DASH_BACK
 #include "flag.h"
+
+#define BUILD_SRC_FILES "build_src/shared.h",            \
+                        "build_src/lib-build.h",         \
+                        "build_src/libs/box2d-build.h",  \
+                        "build_src/libs/raylib-build.h", \
+                        "build_src/libs/pcg-c-build.h",  \
+                        "build_src/libs/tinycthreads-build.h"
 
 #define BOOL2STR(flag) flag ? "set" : "unset"
 
@@ -67,6 +75,7 @@ bool build_libs()
     try_lib_build(BOX2D_LIB, box2d_data);
     try_lib_build(RAYLIB_LIB, raylib_data);
     try_lib_build(PCG_C_LIB, pcg_c_data);
+    try_lib_build(TINYCTHREADS_LIB, tinycthreads_data);
 
     print_separator(NOB_INFO);
     return true;
@@ -168,8 +177,6 @@ bool compile_main(const BuildFlags flags)
         nob_cmd_append(&cmd, "-O3", "-march=native");
 
     nob_cmd_append(&cmd, "-I./" SRC_DIR);
-    nob_cmd_append(&cmd, "-I./" SRC_DIR "external/genann");
-    nob_cmd_append(&cmd, "-I./" SRC_DIR "external/tinycthreads");
     nob_cmd_append(&cmd, "-I./" INCLUDE_DIR);
 
     nob_cc_output(&cmd, OUTPUT_FILE);
@@ -179,15 +186,11 @@ bool compile_main(const BuildFlags flags)
                   SRC_DIR "creature.c",
                   SRC_DIR "trainer.c",
                   SRC_DIR "random.c",
-                  SRC_DIR "utils.c",
-                  SRC_DIR "external/genann/genann.c",
-#ifdef _WIN32
-                  SRC_DIR "external/tinycthreads/tinycthread.c",
-#endif
-    );
-    nob_cmd_append(&cmd, BUILD_DIR BOX2D_LIB_FILE, "-lm");
-    nob_cmd_append(&cmd, BUILD_DIR RAYLIB_LIB_FILE);
-    nob_cmd_append(&cmd, BUILD_DIR PCG_C_LIB_FILE);
+                  SRC_DIR "genann.c",
+                  SRC_DIR "utils.c", );
+    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB), "-lm");
+    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
+    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(PCG_C_LIB));
 
 #ifdef _WIN32
     nob_cmd_append(&cmd, "-lopengl32", "-lgdi32", "-lwinmm", "-lshell32");
@@ -201,12 +204,7 @@ bool compile_main(const BuildFlags flags)
 
 int main(int argc, char **argv)
 {
-    NOB_GO_REBUILD_URSELF_PLUS(argc, argv,
-                               "build_src/shared.h",
-                               "build_src/lib-build.h",
-                               "build_src/box2d-build.h",
-                               "build_src/raylib-build.h",
-                               "build_src/pcg-c-build.h");
+    NOB_GO_REBUILD_URSELF_PLUS(argc, argv, BUILD_SRC_FILES);
 
     const BuildFlags b_flags = parse_flags(argc, argv);
 
