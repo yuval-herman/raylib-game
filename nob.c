@@ -77,7 +77,6 @@ void usage(FILE *stream)
 BuildFlags parse_flags(int argc, char **argv)
 {
     bool *help = flag_bool("help", false, "Print this help to stdout and exit with 0");
-    bool *move_window = flag_bool("move_window", false, "Make the game window appear in the top-right corner of the screen. This is helpful for development.");
     bool *debug = flag_bool("debug", false, "Compile with debug symbols");
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
@@ -211,15 +210,12 @@ bool compile_main(const BuildFlags flags)
     nob_cc_output(&cmd, OUTPUT_FILE);
     nob_cc_inputs(&cmd,
                   SRC_DIR "main.c",
-                  SRC_DIR "physics.c",
-                  SRC_DIR "creature.c",
-                  SRC_DIR "trainer.c",
-                  SRC_DIR "random.c",
-                  SRC_DIR "genann.c",
+                  SRC_DIR "draw_manager.c",
                   SRC_DIR "utils.c", );
-    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB), "-lm");
+    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(PCG_C_LIB));
+    nob_cmd_append(&cmd, "-lm");
 
 #ifdef _WIN32
     nob_cmd_append(&cmd, "-lopengl32", "-lgdi32", "-lwinmm", "-lshell32");
