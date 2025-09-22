@@ -1,6 +1,7 @@
+#include "draw_manager.h"
 #include "raylib.h"
 
-void init_window()
+void draw_window_make()
 {
     const int screenWidth = GetMonitorWidth(0);
     const int screenHeight = GetMonitorHeight(0);
@@ -15,17 +16,17 @@ void init_window()
     SetTargetFPS(60);
 }
 
-void deinit_window()
+void draw_window_destroy()
 {
     CloseWindow();
 }
 
-bool window_should_close() { return WindowShouldClose(); }
+bool draw_window_should_close() { return WindowShouldClose(); }
 
-void draw()
+void draw_draw()
 {
     BeginDrawing();
-    ClearBackground(RAYWHITE);
+    ClearBackground(DARKGRAY);
 
     EndDrawing();
 }

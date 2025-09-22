@@ -211,6 +211,7 @@ bool compile_main(const BuildFlags flags)
     nob_cc_inputs(&cmd,
                   SRC_DIR "main.c",
                   SRC_DIR "draw_manager.c",
+                  SRC_DIR "construct.c",
                   SRC_DIR "utils.c", );
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));

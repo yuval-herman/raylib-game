@@ -1,16 +1,17 @@
 #include "utils.h"
 #include "draw_manager.h"
+#include "construct.h"
 
 int main(void)
 {
-    init_window();
+    draw_window_make();
 
-    while (!window_should_close())
+    while (!draw_window_should_close())
     {
-        draw();
+        draw_draw();
     }
 
-    deinit_window();
+    draw_window_destroy();
 
     return 0;
 }
