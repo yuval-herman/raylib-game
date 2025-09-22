@@ -1,6 +1,8 @@
 #ifndef _UTILS_H
 #define _UTILS_H
 
+#define ARRAY_LEN(array) (sizeof(array) / sizeof(array[0]))
+
 typedef enum
 {
     LOG_DEBUG,
