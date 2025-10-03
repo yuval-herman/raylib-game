@@ -62,6 +62,21 @@ void get_node_velocities(Creature *creature, double *node_velocities)
     }
 }
 
+// Gets all joint lengths
+void get_joint_lengths(Creature *creature, double *joint_lengths)
+{
+    for (unsigned int joint_i = 0; joint_i < creature->joint_amount; joint_i++)
+    {
+        JointData joint_data = creature->joints_data[joint_i];
+        b2BodyId node_a = creature->node_ids[joint_data.node_a_idx];
+        b2BodyId node_b = creature->node_ids[joint_data.node_b_idx];
+        b2Vec2 anchor_a = b2Body_GetWorldPoint(node_a, b2Vec2_zero);
+        b2Vec2 anchor_b = b2Body_GetWorldPoint(node_b, b2Vec2_zero);
+
+        joint_lengths[joint_i] = b2Distance(anchor_a, anchor_b);
+    }
+}
+
 b2BodyId make_node(b2WorldId world_id, b2Vec2 pos, float radius)
 {
     assert(radius > 0);
@@ -140,6 +155,8 @@ Creature creature_make(RandomState *rng, b2WorldId world_id, b2Vec2 *node_positi
         node_amount * 2
         // node velocities [x, y]
         + node_amount * 2
+        // joints lengths
+        + joint_amount
         // center height
         + 1
         // instruction flags
@@ -267,14 +284,14 @@ void creature_draw(Creature creature)
 
 void creature_think(Creature *creature, CreatureInstruction inst)
 {
-    // first are nod position, then instruction flags
     double *inputs = creature->brain_inputs;
     b2Vec2 center = get_node_rel_positions(creature, inputs);
     inputs += creature->node_amount * 2;
     get_node_velocities(creature, inputs);
     inputs += creature->node_amount * 2;
+    get_joint_lengths(creature, inputs);
+    inputs += creature->joint_amount;
     inputs[0] = center.y;
-
     inputs[1] = inst == INST_LEFT ? 1 : -1;
     inputs[2] = inst == INST_RIGHT ? 1 : -1;
     inputs[3] = inst == INST_NONE ? 1 : -1;

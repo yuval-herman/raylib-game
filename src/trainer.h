@@ -26,7 +26,7 @@ You can also shift the CROSSOVER_BIAS towards 1 to select stronger genes, but ag
 #define TREND_WINDOW 15 // How many generations to use to calculate the trend
 
 #define POP_SIZE 90
-#define EVOLUTION_GENERATIONS 300
+#define EVOLUTION_GENERATIONS 70
 
 #define EVALUATION_TESTS 6
 #define MAX_EVALUATION_STEPS 60 * 15                                  // maximum evaluation steps in noneterminstic mode, actual amount otherwise
