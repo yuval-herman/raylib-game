@@ -44,10 +44,41 @@
 
 typedef enum NobSubcommand
 {
+SUB_UNKNOWN,
     SUB_RUN,
     SUB_TEST,
     SUB_COMPILE,
 } NobSubcommand;
+
+NobSubcommand ssub2enum(const char *command)
+{
+    if (strcmp(command, "compile") == 0)
+        return SUB_COMPILE;
+    else if (strcmp(command, "run") == 0)
+        return SUB_RUN;
+    else if (strcmp(command, "test") == 0)
+        return SUB_TEST;
+    else
+        return SUB_UNKNOWN;
+}
+
+char *esub2str(NobSubcommand command)
+{
+    switch (command)
+    {
+    case SUB_RUN:
+        return "run";
+    case SUB_TEST:
+        return "test";
+    case SUB_COMPILE:
+        return "compile";
+    default:
+        // If DNDEBUG isn't set, fail here, if not, fall through to unknown
+        assert(false);
+    case SUB_UNKNOWN:
+        return "UNKNOWN";
+    }
+}
 
 typedef struct BuildFlags
 {
@@ -94,13 +125,8 @@ BuildFlags parse_flags(int argc, char **argv)
     if (flag_rest_argc() > 0)
     {
         const char *command_str = flag_rest_argv()[0];
-        if (strcmp(command_str, "compile") == 0)
-            sub_command = SUB_COMPILE;
-        else if (strcmp(command_str, "run") == 0)
-            sub_command = SUB_RUN;
-        else if (strcmp(command_str, "test") == 0)
-            sub_command = SUB_TEST;
-        else
+        sub_command = ssub2enum(command_str);
+        if (sub_command == SUB_UNKNOWN)
         {
             usage(stderr);
             fprintf(stderr, "ERROR: %s: unknown sub command\n", command_str);
@@ -122,11 +148,12 @@ BuildFlags parse_flags(int argc, char **argv)
 void print_set_flags(const BuildFlags flags)
 {
     print_separator(NOB_INFO);
-
     nob_log(NOB_INFO, "Flags:");
     nob_log(NOB_INFO, "\t\t%-15s:\t%5s", "debug", BOOL2STR(flags.debug));
     nob_log(NOB_INFO, "\t\t%-15s:\t%5s", "optimize", BOOL2STR(flags.optimize));
     nob_log(NOB_INFO, "\t\t%-15s:\t%5s", "force", BOOL2STR(flags.force));
+    print_separator(NOB_INFO);
+nob_log(NOB_INFO, "sub command: %s", esub2str(flags.sub_command));
     print_separator(NOB_INFO);
 
     if (flags.custom_defines.count > 0)
