@@ -1,57 +1,259 @@
+#include <stdlib.h>
+#include <assert.h>
+#include <string.h>
+#include "utils.h"
 #include "construct.h"
-#include "box2d.h"
+#include "raymath.h"
 
-typedef struct JointsData
-{
-    b2JointId *joint_ids;
-    unsigned int *node_a_idx;
-    unsigned int *node_b_idx;
-    unsigned int joint_amount;
-    bool *is_muscle;
-} JointsData;
-
-typedef struct NodesData
-{
-    b2BodyId *node_ids;
-    b2Vec2 *original_node_position;
-    unsigned int node_amount;
-} NodesData;
+const float max_motor_speed = 100.0f;
+const float min_motor_speed = -100.0f;
 
 typedef struct Construct
 {
+    b2WorldId world_id;
+
     genann *brain;
     // Used to reduce allocations
     double *brain_inputs;
 
-    b2WorldId world_id;
-
-    NodesData nodes_data;
-    JointsData joints_data;
+    b2BodyId *node_ids;
+    int node_count;
+    b2JointId *joint_ids;
+    int joint_count;
 } Construct;
 
-b2BodyId make_node(b2WorldId world_id, b2Vec2 pos)
+/* ---------- Helpers ---------- */
+
+static inline bool valid_construct(const Construct *c)
 {
+    return c != NULL;
+}
+
+b2Vec2 construct_get_center(Construct *construct)
+{
+    b2Vec2 center = b2Vec2_zero;
+    assert(construct && construct->node_count > 0);
+
+    for (int body_i = 0; body_i < construct->node_count; body_i++)
+    {
+        b2Vec2 pos = b2Body_GetPosition(construct->node_ids[body_i]);
+        center.x += pos.x;
+        center.y += pos.y;
+    }
+    center.x /= construct->node_count;
+    center.y /= construct->node_count;
+    return center;
+}
+
+/* Gets all node positions in an interleaved array [x,y,x,y,...]
+ * Positions are relative to construct center
+ * node_positions must point to at least node_count*2 doubles.
+ * Returns the center position (world coords).
+ */
+b2Vec2 get_node_rel_positions(Construct *construct, double *node_positions)
+{
+    b2Vec2 center = b2Vec2_zero;
+    assert(construct && construct->node_count > 0);
+
+    for (int body_i = 0; body_i < construct->node_count; body_i++)
+    {
+        b2Vec2 pos = b2Body_GetPosition(construct->node_ids[body_i]);
+        center.x += pos.x;
+        center.y += pos.y;
+        node_positions[body_i * 2] = pos.x;
+        node_positions[body_i * 2 + 1] = pos.y;
+    }
+
+    // Calculate average center position and subtract to make positions relative.
+    center.x /= construct->node_count;
+    center.y /= construct->node_count;
+    for (int body_i = 0; body_i < construct->node_count; body_i++)
+    {
+        node_positions[body_i * 2] -= center.x;
+        node_positions[body_i * 2 + 1] -= center.y;
+    }
+    return center;
+}
+
+/* Gets all node linear velocities in an interleaved array [x,y,x,y,...]
+ * node_velocities must point to at least node_count*2 doubles.
+ */
+void get_node_velocities(Construct *construct, double *node_velocities)
+{
+    assert(construct && construct->node_count > 0);
+
+    for (int body_i = 0; body_i < construct->node_count; body_i++)
+    {
+        b2Vec2 vel = b2Body_GetLinearVelocity(construct->node_ids[body_i]);
+        node_velocities[body_i * 2] = vel.x;
+        node_velocities[body_i * 2 + 1] = vel.y;
+    }
+}
+
+/* Gets all joint lengths into joint_lengths array (length joint_count). */
+void get_joint_lengths(Construct *construct, double *joint_lengths)
+{
+    assert(construct && construct->joint_count > 0);
+
+    for (int joint_i = 0; joint_i < construct->joint_count; joint_i++)
+    {
+        b2BodyId node_a = b2Joint_GetBodyA(construct->joint_ids[joint_i]);
+        b2BodyId node_b = b2Joint_GetBodyB(construct->joint_ids[joint_i]);
+        b2Vec2 anchor_a = b2Body_GetWorldPoint(node_a, b2Vec2_zero);
+        b2Vec2 anchor_b = b2Body_GetWorldPoint(node_b, b2Vec2_zero);
+
+        joint_lengths[joint_i] = b2Distance(anchor_a, anchor_b);
+    }
+}
+
+bool construct_is_finalized(Construct *c)
+{
+    assert(c);
+    return c->brain != NULL;
+}
+
+/* If a construct is finalized, make it un-finalized. */
+void construct_make_unfinished(Construct *c)
+{
+    assert(c);
+    if (!construct_is_finalized(c))
+        return;
+    genann_free(c->brain);
+    c->brain = NULL;
+    free(c->brain_inputs);
+    c->brain_inputs = NULL;
+    log_debug("un-finalized construct");
+}
+
+/* ---------- Lifecycle ---------- */
+
+Construct *construct_make(b2WorldId world_id)
+{
+    Construct *construct = calloc(1, sizeof *construct);
+    log_debug("Allocated new construct");
+    construct->world_id = world_id;
+    return construct;
+}
+
+/* Finalize: (re)create brain and brain_inputs. Requires at least one node and joint. */
+void construct_finalize(Construct *c, RandomState *rng)
+{
+    assert(c && rng);
+    assert(c->node_count > 0 && c->joint_count > 0);
+
+    construct_make_unfinished(c);
+
+    // Compute input/output sizes
+    int inputs =
+        // node positions [x, y]
+        c->node_count * 2
+        // node velocities [x, y]
+        + c->node_count * 2
+        // joints lengths
+        + c->joint_count
+        // center height
+        + 1
+        // instruction flags
+        + 3;
+    int hidden_layers = 2;
+    int hidden_nodes = inputs * 3;
+    int outputs = c->joint_count;
+
+    c->brain_inputs = malloc(sizeof(double) * inputs);
+    c->brain = genann_init(rng, inputs,
+                           hidden_layers,
+                           hidden_nodes,
+                           outputs);
+}
+
+/* Destroys construct and also destroys physics bodies and joints in world. Safe to call with NULL members. */
+void construct_destroy(Construct *c)
+{
+    assert(c);
+
+    /* Destroy joints from physics world first */
+    if (c->joint_ids)
+    {
+        for (int i = 0; i < c->joint_count; i++)
+        {
+            b2DestroyJoint(c->joint_ids[i], false);
+        }
+    }
+
+    /* Destroy bodies */
+    if (c->node_ids)
+    {
+        for (int i = 0; i < c->node_count; i++)
+        {
+            b2DestroyBody(c->node_ids[i]);
+        }
+    }
+
+    genann_free(c->brain);
+    c->brain = NULL;
+    free(c->brain_inputs);
+    c->brain_inputs = NULL;
+    free(c->joint_ids);
+    c->joint_ids = NULL;
+    free(c->node_ids);
+    c->node_ids = NULL;
+    free(c);
+    c = NULL;
+}
+
+/* ---------- Mutators ---------- */
+
+/* Add a node and return its index or -1 on failure or max nodes reached. */
+int construct_add_node(Construct *c, float radius, b2Vec2 pos)
+{
+    assert(c);
+    if (c->node_count >= MAX_NODES)
+    {
+        log_msg(LOG_WARN, "tried adding node after reaching MAX_NODES (%d)", MAX_NODES);
+        return -1;
+    }
+    assert(radius > 0);
+
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_dynamicBody;
     body_def.position = pos;
     body_def.motionLocks.angularZ = true;
 
-    b2BodyId body_id = b2CreateBody(world_id, &body_def);
+    b2BodyId body_id = b2CreateBody(c->world_id, &body_def);
 
     b2ShapeDef shape_def = b2DefaultShapeDef();
     shape_def.material.friction = 1;
     shape_def.density = 1;
 
-    b2Circle circle = {.center = b2Vec2_zero, .radius = 1};
+    b2Circle circle = {.center = b2Vec2_zero, .radius = radius};
     b2CreateCircleShape(body_id, &shape_def, &circle);
 
-    return body_id;
+    c->node_ids = realloc(c->node_ids, sizeof c->node_ids[0] * ++c->node_count);
+    c->node_ids[c->node_count - 1] = body_id;
+
+    log_debug("allocated new node");
+    construct_make_unfinished(c);
+    return c->node_count - 1;
 }
 
-b2JointId make_joint(b2WorldId world_id, b2BodyId node1, b2BodyId node2,
-                     JointsData joints_data, unsigned int joint_idx)
+/* Add a distance joint between node indices. Return joint index or -1 on failure. */
+int construct_add_joint(Construct *c, int node1_idx, int node2_idx, bool is_muscle)
 {
+    assert(c);
+
+    if (c->joint_count >= MAX_JOINTS)
+    {
+        log_msg(LOG_WARN, "tried adding joint after reaching MAX_JOINTS (%d)", MAX_JOINTS);
+        return -1;
+    }
+
+    assert(node1_idx >= 0 && node2_idx >= 0);
+    assert(node1_idx < c->node_count && node2_idx < c->node_count);
+
     b2DistanceJointDef joint_def = b2DefaultDistanceJointDef();
+
+    b2BodyId node1 = c->node_ids[node1_idx];
+    b2BodyId node2 = c->node_ids[node2_idx];
 
     joint_def.base.bodyIdA = node1;
     joint_def.base.bodyIdB = node2;
@@ -61,84 +263,49 @@ b2JointId make_joint(b2WorldId world_id, b2BodyId node1, b2BodyId node2,
 
     const float dist = b2Distance(anchorA, anchorB);
 
-    joint_def.minLength = dist * 0.5;
+    joint_def.minLength = dist * 0.5f;
     joint_def.length = dist;
-    joint_def.maxLength = dist * 1.5;
+    joint_def.maxLength = dist * 1.5f;
 
     joint_def.enableLimit = true;
-    joint_def.enableSpring = joints_data.is_muscle[joint_idx];
-    joint_def.enableMotor = joints_data.is_muscle[joint_idx];
-
-    joint_def.motorSpeed = 1;
+    joint_def.enableSpring = is_muscle;
+    joint_def.enableMotor = is_muscle;
+    joint_def.motorSpeed = 1.0f;
     joint_def.maxMotorForce = 200.0f;
 
-    return b2CreateDistanceJoint(world_id, &joint_def);
+    c->joint_ids = realloc(c->joint_ids, sizeof c->joint_ids[0] * ++c->joint_count);
+    c->joint_ids[c->joint_count - 1] = b2CreateDistanceJoint(c->world_id, &joint_def);
+
+    log_debug("allocated new joint");
+    construct_make_unfinished(c);
+    return c->joint_count - 1;
 }
 
-Construct *construct_make(RandomState *rng, b2WorldId world_id, b2Vec2 *node_positions, unsigned int node_amount, JointData *joints, unsigned int joint_amount)
+/* Update: fills brain inputs and runs brain. Safe-guards added. */
+void construct_update(Construct *construct, ConstructInstruction inst)
 {
-    b2Vec2 *owned_node_positions = malloc(sizeof node_positions[0] * node_amount);
-    memcpy(owned_node_positions, node_positions, sizeof node_positions[0] * node_amount);
-    // Nodes
-    b2BodyId *node_ids = malloc(sizeof node_ids[0] * node_amount);
-    for (size_t node_i = 0; node_i < node_amount; node_i++)
+    assert(construct);
+    assert(construct_is_finalized(construct));
+    assert(construct->node_count > 0 && construct->joint_count > 0);
+
+    double *inputs = construct->brain_inputs;
+    /* layout must match finalize: node_pos(2*N), node_vel(2*N), joint_len(M), center(1), inst_flags(3) */
+    b2Vec2 center = get_node_rel_positions(construct, inputs);
+    inputs += construct->node_count * 2;
+    get_node_velocities(construct, inputs);
+    inputs += construct->node_count * 2;
+    get_joint_lengths(construct, inputs);
+    inputs += construct->joint_count;
+    inputs[0] = center.y;
+    inputs[1] = (inst == INST_LEFT) ? 1.0 : -1.0;
+    inputs[2] = (inst == INST_RIGHT) ? 1.0 : -1.0;
+    inputs[3] = (inst == INST_NONE) ? 1.0 : -1.0;
+
+    const double *motor_speeds = genann_run(construct->brain, construct->brain_inputs);
+
+    for (int i = 0; i < construct->joint_count; i++)
     {
-        node_ids[node_i] = make_node(world_id, node_positions[node_i], default_node_radius);
+        float motor_speed = Remap((float)motor_speeds[i], 0.0f, 1.0f, min_motor_speed, max_motor_speed);
+        b2DistanceJoint_SetMotorSpeed(construct->joint_ids[i], motor_speed);
     }
-
-    // Joints
-    b2JointId *joint_ids = malloc(sizeof joint_ids[0] * joint_amount);
-    JointData *joints_data = malloc(sizeof joints_data[0] * joint_amount);
-    for (size_t joint_i = 0; joint_i < joint_amount; joint_i++)
-    {
-        joints_data[joint_i] = joints[joint_i];
-        if (joints_data[joint_i].rest_motor_speed == 0)
-            joints_data[joint_i].rest_motor_speed = default_motor_speed;
-
-        joint_ids[joint_i] = connect_nodes(world_id, node_ids[joints[joint_i].node_a_idx],
-                                           node_ids[joints[joint_i].node_b_idx], joints_data + joint_i);
-    }
-
-    // Brain
-    // Inputs:
-    int inputs =
-        // node positions [x, y]
-        node_amount * 2
-        // node velocities [x, y]
-        + node_amount * 2
-        // center height
-        + 1
-        // instruction flags
-        + 3;
-    // Outputs:
-    // motor speeds for joints
-    double *brain_inputs = malloc(sizeof(double) * inputs);
-    int hidden_layers = 2;
-    int hidden_nodes = inputs * 3;
-    int outputs = joint_amount;
-    genann *ann = genann_init(rng, inputs,
-                              hidden_layers,
-                              hidden_nodes,
-                              outputs);
-
-    return (Creature){
-        .node_amount = node_amount,
-        .node_ids = node_ids,
-        .original_node_positions = owned_node_positions,
-        .node_radius = default_node_radius,
-
-        .joint_amount = joint_amount,
-        .joint_ids = joint_ids,
-        .joints_data = joints_data,
-
-        .world_id = world_id,
-
-        .brain = ann,
-        .brain_inputs = brain_inputs,
-    };
 }
-
-Construct *construct_destroy();
-
-void construct_update();
-void construct_input_update();

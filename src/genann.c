@@ -235,7 +235,7 @@ void genann_randomize(RandomState *rng, genann *ann)
     int i;
     for (i = 0; i < ann->total_weights; ++i)
     {
-        double r = random_double(rng);
+        double r = random_real(rng);
         /* Sets weights from -0.5 to 0.5. */
         ann->weight[i] = r - 0.5;
     }

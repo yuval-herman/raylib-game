@@ -44,7 +44,7 @@
 
 typedef enum NobSubcommand
 {
-SUB_UNKNOWN,
+    SUB_UNKNOWN,
     SUB_RUN,
     SUB_TEST,
     SUB_COMPILE,
@@ -153,7 +153,7 @@ void print_set_flags(const BuildFlags flags)
     nob_log(NOB_INFO, "\t\t%-15s:\t%5s", "optimize", BOOL2STR(flags.optimize));
     nob_log(NOB_INFO, "\t\t%-15s:\t%5s", "force", BOOL2STR(flags.force));
     print_separator(NOB_INFO);
-nob_log(NOB_INFO, "sub command: %s", esub2str(flags.sub_command));
+    nob_log(NOB_INFO, "sub command: %s", esub2str(flags.sub_command));
     print_separator(NOB_INFO);
 
     if (flags.custom_defines.count > 0)
@@ -239,6 +239,9 @@ bool compile_main(const BuildFlags flags)
                   SRC_DIR "main.c",
                   SRC_DIR "draw_manager.c",
                   SRC_DIR "construct.c",
+                  SRC_DIR "physics.c",
+                  SRC_DIR "genann.c",
+                  SRC_DIR "random.c",
                   SRC_DIR "utils.c", );
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
