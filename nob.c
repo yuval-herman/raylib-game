@@ -4,6 +4,7 @@
 #include "build_src/libs/pcg-c-build.h"
 #include "build_src/libs/tinycthreads-build.h"
 #include "build_src/lib-build.h"
+#include "src/utils.c"
 
 #define NOB_EXPERIMENTAL_DELETE_OLD
 #include "build_src/shared.h"
@@ -42,36 +43,35 @@
         }                                                            \
     } while (0);
 
+#define SUB_COMMANDS(...)          \
+        X(RUN __VA_OPT__(,) __VA_ARGS__)     \
+        X(TEST __VA_OPT__(,) __VA_ARGS__)    \
+        X(COMPILE __VA_OPT__(,) __VA_ARGS__)
+
 typedef enum NobSubcommand
 {
     SUB_UNKNOWN,
-    SUB_RUN,
-    SUB_TEST,
-    SUB_COMPILE,
+    #define X(cmd) SUB_##cmd,
+    SUB_COMMANDS()
+    #undef X
 } NobSubcommand;
 
 NobSubcommand ssub2enum(const char *command)
 {
-    if (strcmp(command, "compile") == 0)
-        return SUB_COMPILE;
-    else if (strcmp(command, "run") == 0)
-        return SUB_RUN;
-    else if (strcmp(command, "test") == 0)
-        return SUB_TEST;
-    else
-        return SUB_UNKNOWN;
+    char* low_command = nob_temp_strdup(str_lower(command));
+    #define X(cmd) if (strcmp(low_command, str_lower(#cmd)) == 0) return SUB_##cmd;
+    SUB_COMMANDS()
+    #undef X
+    return SUB_UNKNOWN;
 }
 
 char *esub2str(NobSubcommand command)
 {
     switch (command)
     {
-    case SUB_RUN:
-        return "run";
-    case SUB_TEST:
-        return "test";
-    case SUB_COMPILE:
-        return "compile";
+    #define X(cmd) case SUB_##cmd: return str_lower(#cmd);
+    SUB_COMMANDS()
+    #undef X
     default:
         // If DNDEBUG isn't set, fail here, if not, fall through to unknown
         assert(false);
