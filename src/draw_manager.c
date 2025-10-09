@@ -1,5 +1,6 @@
 #include "draw_manager.h"
 #include "raylib.h"
+#include "rlgl.h"
 #include "assert.h"
 #include "utils.h"
 #include <stdlib.h>
@@ -67,8 +68,15 @@ void draw_shape(Draw_shape shape) {
     switch (shape.type) {
     case CIRCLE:
     {
-      log_debug("Drawing circle");
       Draw_Circle circle = shape.shape.CIRCLE;
+      log_debug("Drawing circle: {%.2f,%.2f} rad: %.2f color: {%d,%d,%d,%d}",
+                circle.pos.x,
+                circle.pos.y,
+                circle.radius,
+                circle.color.r,
+                circle.color.g,
+                circle.color.b,
+                circle.color.a) ;
       DrawCircleV(vec2r(circle.pos), circle.radius, color2r(circle.color));
     }
     break;
@@ -92,6 +100,7 @@ void draw_window_make()
     // Width and height are arbitrary, window is maximized
     InitWindow(800, 600, "empty game, full potential");
 
+    rlSetCullFace(RL_CULL_FACE_FRONT);
     SetTargetFPS(60);
 }
 
@@ -104,12 +113,17 @@ bool draw_window_should_close() { return WindowShouldClose(); }
 
 void draw_draw()
 {
+    static Camera2D camera = {.zoom = 10,
+       .offset = (Vector2){.x = 500,
+       .y = 300}};
+
     BeginDrawing();
     ClearBackground(RAYWHITE);
-
-    for (unsigned int i=0; i<reg_shapes.count; i++) {
-        draw_shape(reg_shapes.shapes[i]);
-    }
-
+        BeginMode2D(camera);
+            rlScalef(1,-1,1);
+            for (unsigned int i=0; i<reg_shapes.count; i++) {
+                draw_shape(reg_shapes.shapes[i]);
+            }
+        EndMode2D();
     EndDrawing();
 }
