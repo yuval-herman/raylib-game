@@ -1,6 +1,8 @@
 #include "physics.h"
 #include "draw_manager.h"
 #include "construct.h"
+#include "random.h"
+
 
 int main(void)
 {
@@ -22,6 +24,8 @@ int main(void)
     }
 
     draw_window_destroy();
+
+    random_destroy(rng);
 
     return 0;
 }
