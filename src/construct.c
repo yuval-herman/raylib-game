@@ -209,7 +209,7 @@ int construct_add_node(Construct *c, float radius, b2Vec2 pos)
     assert(c);
     if (c->node_count >= MAX_NODES)
     {
-        log_msg(LOG_WARN, "tried adding node after reaching MAX_NODES (%d)", MAX_NODES);
+        log_msg(U_LOG_WARN, "tried adding node after reaching MAX_NODES (%d)", MAX_NODES);
         return -1;
     }
     assert(radius > 0);
@@ -243,7 +243,7 @@ int construct_add_joint(Construct *c, int node1_idx, int node2_idx, bool is_musc
 
     if (c->joint_count >= MAX_JOINTS)
     {
-        log_msg(LOG_WARN, "tried adding joint after reaching MAX_JOINTS (%d)", MAX_JOINTS);
+        log_msg(U_LOG_WARN, "tried adding joint after reaching MAX_JOINTS (%d)", MAX_JOINTS);
         return -1;
     }
 
