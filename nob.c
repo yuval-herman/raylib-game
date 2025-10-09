@@ -227,7 +227,10 @@ bool compile_main(const BuildFlags flags)
     }
 
     if (flags.debug)
+    {
+        nob_cmd_append(&cmd, "-DMIN_LOG_LEVEL=U_LOG_DEBUG");
         nob_cmd_append(&cmd, "-g", "-O0", "-fsanitize=address,undefined");
+    }
     else if (flags.optimize)
         nob_cmd_append(&cmd, "-O3", "-march=native");
 
