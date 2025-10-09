@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include "math_functions.h"
 #include "utils.h"
 #include "construct.h"
 #include "raymath.h"
@@ -16,8 +17,10 @@ typedef struct Construct
     // Used to reduce allocations
     double *brain_inputs;
 
-    b2BodyId *node_ids;
+    Construct_node* nodes_data;
     int node_count;
+
+    b2BodyId *node_ids;
     b2JointId *joint_ids;
     int joint_count;
 } Construct;
@@ -190,21 +193,30 @@ void construct_destroy(Construct *c)
     }
 
     genann_free(c->brain);
-    c->brain = NULL;
     free(c->brain_inputs);
-    c->brain_inputs = NULL;
     free(c->joint_ids);
-    c->joint_ids = NULL;
     free(c->node_ids);
-    c->node_ids = NULL;
+    free(c->nodes_data);
     free(c);
     c = NULL;
+}
+
+int construct_get_node_amount(Construct *c) {
+    return c->node_count;
+}
+
+void construct_get_nodes(Construct *c, Construct_node* nodes, int max_nodes) {
+    int loop_boundary = b2MaxInt(max_nodes, c->node_count);
+    for (int i=0; i < loop_boundary; i++) {
+        nodes[i].pos = b2Body_GetPosition(c->node_ids[i]);
+        nodes[i].radius = c->nodes_data[i].radius;
+    }
 }
 
 /* ---------- Mutators ---------- */
 
 /* Add a node and return its index or -1 on failure or max nodes reached. */
-int construct_add_node(Construct *c, float radius, b2Vec2 pos)
+int construct_add_node(Construct *c, Construct_node node)
 {
     assert(c);
     if (c->node_count >= MAX_NODES)
@@ -212,11 +224,11 @@ int construct_add_node(Construct *c, float radius, b2Vec2 pos)
         log_msg(U_LOG_WARN, "tried adding node after reaching MAX_NODES (%d)", MAX_NODES);
         return -1;
     }
-    assert(radius > 0);
+    assert(node.radius > 0);
 
     b2BodyDef body_def = b2DefaultBodyDef();
     body_def.type = b2_dynamicBody;
-    body_def.position = pos;
+    body_def.position = node.pos;
     body_def.motionLocks.angularZ = true;
 
     b2BodyId body_id = b2CreateBody(c->world_id, &body_def);
@@ -225,11 +237,15 @@ int construct_add_node(Construct *c, float radius, b2Vec2 pos)
     shape_def.material.friction = 1;
     shape_def.density = 1;
 
-    b2Circle circle = {.center = b2Vec2_zero, .radius = radius};
+    b2Circle circle = {.center = b2Vec2_zero, .radius = node.radius};
     b2CreateCircleShape(body_id, &shape_def, &circle);
 
-    c->node_ids = realloc(c->node_ids, sizeof c->node_ids[0] * ++c->node_count);
-    c->node_ids[c->node_count - 1] = body_id;
+    c->node_count++;
+    c->node_ids = realloc(c->node_ids, sizeof c->node_ids[0] * c->node_count);
+    c->node_ids[c->node_count-1] = body_id;
+
+    c->nodes_data = realloc(c->nodes_data, sizeof c->nodes_data[0] * c->node_count);
+    c->nodes_data[c->node_count-1] = node;
 
     log_debug("allocated new node");
     construct_make_unfinished(c);
