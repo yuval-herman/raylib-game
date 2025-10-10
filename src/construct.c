@@ -204,7 +204,7 @@ void construct_destroy(Construct *c)
     c = NULL;
 }
 
-int construct_get_node_amount(Construct *c) {
+int construct_get_node_count(Construct *c) {
     return c->node_count;
 }
 
@@ -216,7 +216,7 @@ void construct_get_nodes(Construct *c, Construct_node* nodes, int max_nodes) {
     }
 }
 
-int construct_get_joint_amount(Construct *c) {
+int construct_get_joint_count(Construct *c) {
     return c->joint_count;
 }
 

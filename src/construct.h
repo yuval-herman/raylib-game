@@ -43,10 +43,10 @@ int construct_add_node(Construct *c, Construct_node node);
 // Add a joint to creature and returns its index. Returns -1 if there are max amount of joints already.
 int construct_add_joint(Construct *c, Construct_joint joint);
 
-int construct_get_node_amount(Construct *c);
+int construct_get_node_count(Construct *c);
 void construct_get_nodes(Construct *c, Construct_node* nodes, int max_nodes);
 
-int construct_get_joint_amount(Construct *c);
+int construct_get_joint_count(Construct *c);
 void construct_get_joints(Construct *c, Construct_joint* joints, int max_joints);
 
 void construct_update(Construct *construct, ConstructInstruction inst);
