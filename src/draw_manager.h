@@ -3,6 +3,12 @@
 
 #include <stdbool.h>
 
+// X(enum, struct, low-case name)
+#define DRAW_SHAPES                     \
+X(CIRCLE,    Draw_Circle,    circle)    \
+X(RECTANGLE, Draw_Rectangle, rectangle) \
+X(LINE,      Draw_Line,      line)
+
 typedef struct Draw_Vector2 {float x, y;} Draw_Vector2;
 
 typedef struct Draw_Color {
@@ -18,6 +24,13 @@ typedef struct Draw_Circle {
   Draw_Color color;
 } Draw_Circle;
 
+typedef struct Draw_Rectangle {
+  Draw_Vector2 pos; // top-left position
+  float width;
+  float height;
+  Draw_Color color;
+} Draw_Rectangle;
+
 typedef struct Draw_Line {
   Draw_Vector2 start;
   Draw_Vector2 end;
@@ -25,8 +38,9 @@ typedef struct Draw_Line {
   Draw_Color color;
 } Draw_Line;
 
-Draw_Circle* draw_register_circle(Draw_Circle circle);
-Draw_Line* draw_register_line(Draw_Line line);
+#define X(n_enum, n_struct, n_low) n_struct* draw_register_##n_low(n_struct n_low);
+DRAW_SHAPES
+#undef X
 
 void draw_window_make();
 void draw_window_destroy();

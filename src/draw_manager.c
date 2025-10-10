@@ -7,18 +7,14 @@
 
 #define SHAPE_ARRAY_INIT 32
 
-#define DRAW_SHAPES    \
-X(CIRCLE, Draw_Circle) \
-X(LINE,   Draw_Line)
-
 typedef enum Draw_shapes {
-    #define X(name, type) name,
+    #define X(n_enum, n_struct, n_low) n_enum,
     DRAW_SHAPES
     #undef X
 } Draw_shapes;
 
 typedef union Shapes_union{
-    #define X(name, type) type name;
+    #define X(n_enum, n_struct, n_low) n_struct n_enum;
     DRAW_SHAPES
     #undef X
 } Shapes_union;
@@ -51,18 +47,15 @@ Shapes_union* register_shape(Draw_shape shape) {
     return &new_shape->shape;
 }
 
-Draw_Circle* draw_register_circle(Draw_Circle circle) {
-    log_debug("registering draw circle");
-    return &register_shape((Draw_shape){CIRCLE, {.CIRCLE = circle}})->CIRCLE;
-}
-
-Draw_Line* draw_register_line(Draw_Line line) {
-    log_debug("registering draw line");
-    return &register_shape((Draw_shape){LINE, {.LINE = line}})->LINE;
-}
+#define X(n_enum, n_struct, n_low) n_struct* draw_register_##n_low(n_struct n_low) { \
+    log_debug("registering draw "#n_low); \
+    return &register_shape((Draw_shape){n_enum, {.n_enum = n_low}})->n_enum;}
+DRAW_SHAPES
+#undef X
 
 #define vec2r(vec) ((Vector2){vec.x, vec.y})
 #define color2r(color) ((Color){color.r, color.g, color.b, color.a})
+#define rect2r(rect) ((Rectangle){.x=rect.pos.x,.y=rect.pos.y,.width=rect.width,.height=rect.height})
 
 void draw_shape(Draw_shape shape) {
     switch (shape.type) {
@@ -76,15 +69,42 @@ void draw_shape(Draw_shape shape) {
                 circle.color.r,
                 circle.color.g,
                 circle.color.b,
-                circle.color.a) ;
+                circle.color.a);
+      if (circle.color.a == 0) log_msg(U_LOG_WARN, "Drawing circle with zero opacity");
       DrawCircleV(vec2r(circle.pos), circle.radius, color2r(circle.color));
     }
     break;
     case LINE:
     {
-      log_debug("Drawing line");
       Draw_Line line = shape.shape.LINE;
+      log_debug("Drawing line: {%.2f,%.2f} {%.2f,%.2f} width: %.2f color: {%d,%d,%d,%d}",
+                line.start.x,
+                line.start.y,
+                line.end.x,
+                line.end.y,
+                line.width,
+                line.color.r,
+                line.color.g,
+                line.color.b,
+                line.color.a);
+      if (line.color.a == 0) log_msg(U_LOG_WARN, "Drawing line with zero opacity");
       DrawLineEx(vec2r(line.start), vec2r(line.end), line.width, color2r(line.color));
+    }
+    break;
+    case RECTANGLE:
+    {
+      Draw_Rectangle rect = shape.shape.RECTANGLE;
+      log_debug("Drawing rectangle: {%.2f,%.2f} w: %.2f h: %.2f color: {%d,%d,%d,%d}",
+                rect.pos.x,
+                rect.pos.y,
+                rect.width,
+                rect.height,
+                rect.color.r,
+                rect.color.g,
+                rect.color.b,
+                rect.color.a);
+      if (rect.color.a == 0) log_msg(U_LOG_WARN, "Drawing rectangle with zero opacity");
+      DrawRectangleRec(rect2r(rect), color2r(rect.color));
     }
     break;
     default:

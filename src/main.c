@@ -8,7 +8,16 @@
 int main(void)
 {
     RandomState *rng = random_make();
+
     b2WorldId world_id = physics_make_world();
+    physics_make_ground(world_id);
+    draw_register_rectangle((Draw_Rectangle){
+                            .pos = (Draw_Vector2){-GROUND_EXTENT, -GROUND_HEIGHT},
+                            .width = GROUND_EXTENT*2,
+                            .height = GROUND_HEIGHT,
+                            .color = {0,0,0,255},
+                        });
+    
     Construct *construct = construct_make(world_id);
     construct_add_node(construct, (Construct_node){1, (b2Vec2){10, 10}});
     construct_add_node(construct, (Construct_node){1, (b2Vec2){1, 0}});
