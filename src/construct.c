@@ -20,9 +20,11 @@ typedef struct Construct
     Construct_node* nodes_data;
     int node_count;
 
+    Construct_joint* joints_data;
+    int joint_count;
+
     b2BodyId *node_ids;
     b2JointId *joint_ids;
-    int joint_count;
 } Construct;
 
 /* ---------- Helpers ---------- */
@@ -197,6 +199,7 @@ void construct_destroy(Construct *c)
     free(c->joint_ids);
     free(c->node_ids);
     free(c->nodes_data);
+    free(c->joints_data);
     free(c);
     c = NULL;
 }
@@ -206,11 +209,20 @@ int construct_get_node_amount(Construct *c) {
 }
 
 void construct_get_nodes(Construct *c, Construct_node* nodes, int max_nodes) {
-    int loop_boundary = b2MaxInt(max_nodes, c->node_count);
+    int loop_boundary = b2MinInt(max_nodes, c->node_count);
     for (int i=0; i < loop_boundary; i++) {
         nodes[i].pos = b2Body_GetPosition(c->node_ids[i]);
         nodes[i].radius = c->nodes_data[i].radius;
     }
+}
+
+int construct_get_joint_amount(Construct *c) {
+    return c->joint_count;
+}
+
+void construct_get_joints(Construct *c, Construct_joint* joints, int max_joints) {
+    int loop_boundary = b2MinInt(max_joints, c->joint_count);
+    memcpy(joints, c->joints_data, loop_boundary);
 }
 
 /* ---------- Mutators ---------- */
@@ -253,7 +265,7 @@ int construct_add_node(Construct *c, Construct_node node)
 }
 
 /* Add a distance joint between node indices. Return joint index or -1 on failure. */
-int construct_add_joint(Construct *c, int node1_idx, int node2_idx, bool is_muscle)
+int construct_add_joint(Construct *c, Construct_joint joint)
 {
     assert(c);
 
@@ -263,13 +275,13 @@ int construct_add_joint(Construct *c, int node1_idx, int node2_idx, bool is_musc
         return -1;
     }
 
-    assert(node1_idx >= 0 && node2_idx >= 0);
-    assert(node1_idx < c->node_count && node2_idx < c->node_count);
+    assert(joint.node1_idx >= 0 && joint.node2_idx >= 0);
+    assert(joint.node1_idx < c->node_count && joint.node2_idx < c->node_count);
 
     b2DistanceJointDef joint_def = b2DefaultDistanceJointDef();
 
-    b2BodyId node1 = c->node_ids[node1_idx];
-    b2BodyId node2 = c->node_ids[node2_idx];
+    b2BodyId node1 = c->node_ids[joint.node1_idx];
+    b2BodyId node2 = c->node_ids[joint.node2_idx];
 
     joint_def.base.bodyIdA = node1;
     joint_def.base.bodyIdB = node2;
@@ -284,13 +296,17 @@ int construct_add_joint(Construct *c, int node1_idx, int node2_idx, bool is_musc
     joint_def.maxLength = dist * 1.5f;
 
     joint_def.enableLimit = true;
-    joint_def.enableSpring = is_muscle;
-    joint_def.enableMotor = is_muscle;
+    joint_def.enableSpring = joint.is_muscle;
+    joint_def.enableMotor = joint.is_muscle;
     joint_def.motorSpeed = 1.0f;
     joint_def.maxMotorForce = 200.0f;
 
-    c->joint_ids = realloc(c->joint_ids, sizeof c->joint_ids[0] * ++c->joint_count);
+    c->joint_count++;
+    c->joint_ids = realloc(c->joint_ids, sizeof c->joint_ids[0] * c->joint_count);
     c->joint_ids[c->joint_count - 1] = b2CreateDistanceJoint(c->world_id, &joint_def);
+
+    c->joints_data = realloc(c->joints_data, sizeof c->joints_data[0] * c->joint_count);
+    c->joints_data[c->joint_count - 1] = joint;
 
     log_debug("allocated new joint");
     construct_make_unfinished(c);

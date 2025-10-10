@@ -23,6 +23,12 @@ typedef struct Construct_node {
     b2Vec2 pos;
 } Construct_node;
 
+typedef struct Construct_joint {
+    int node1_idx;
+    int node2_idx;
+    bool is_muscle;
+} Construct_joint;
+
 typedef struct Construct Construct;
 
 // Creates an empty construct. The construct should be built incrementally using build functions like add_node.
@@ -35,10 +41,13 @@ void construct_destroy(Construct *c);
 // Add a node to creature and returns its index. Returns -1 if there are max amount of nodes already.
 int construct_add_node(Construct *c, Construct_node node);
 // Add a joint to creature and returns its index. Returns -1 if there are max amount of joints already.
-int construct_add_joint(Construct *c, int node1_idx, int node2_idx, bool is_muscle);
+int construct_add_joint(Construct *c, Construct_joint joint);
 
 int construct_get_node_amount(Construct *c);
 void construct_get_nodes(Construct *c, Construct_node* nodes, int max_nodes);
+
+int construct_get_joint_amount(Construct *c);
+void construct_get_joints(Construct *c, Construct_joint* joints, int max_joints);
 
 void construct_update(Construct *construct, ConstructInstruction inst);
 
