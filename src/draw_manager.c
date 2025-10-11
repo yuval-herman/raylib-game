@@ -26,30 +26,38 @@ typedef struct Draw_shape {
 
 typedef struct Shapes_array {
   Draw_shape* shapes;
-  unsigned int count;
-  unsigned int capacity;
+  size_t count;
+  size_t capacity;
 } Shapes_array;
 
 Shapes_array reg_shapes = {0};
 
-Shapes_union* register_shape(Draw_shape shape) {
+size_t register_shape(Draw_shape shape) {
     if(reg_shapes.capacity==0) {
       reg_shapes.shapes = calloc(SHAPE_ARRAY_INIT, sizeof reg_shapes.shapes[0]);
       reg_shapes.capacity = SHAPE_ARRAY_INIT;
     }
     if (reg_shapes.capacity<=reg_shapes.count) {
-      unsigned int new_cap = sizeof reg_shapes.shapes[0] * reg_shapes.capacity*2;
-      reg_shapes.shapes = realloc(reg_shapes.shapes, new_cap);
-      reg_shapes.capacity = new_cap;
+      reg_shapes.capacity *= 2;
+      reg_shapes.shapes = realloc(reg_shapes.shapes, sizeof reg_shapes.shapes[0] * reg_shapes.capacity);
     }
-    Draw_shape *new_shape = &reg_shapes.shapes[reg_shapes.count++];
+    Draw_shape *new_shape = &reg_shapes.shapes[reg_shapes.count];
     *new_shape = shape;
-    return &new_shape->shape;
+    // Returns the index of the shape, then increment the actual count
+    return reg_shapes.count++;
 }
 
-#define X(n_enum, n_struct, n_low) n_struct* draw_register_##n_low(n_struct n_low) { \
+#define X(n_enum, n_struct, n_low) size_t draw_register_##n_low(n_struct n_low) { \
     log_debug("registering draw "#n_low); \
-    return &register_shape((Draw_shape){n_enum, {.n_enum = n_low}})->n_enum;}
+    return register_shape((Draw_shape){n_enum, {.n_enum = n_low}});}
+DRAW_SHAPES
+#undef X
+
+#define X(n_enum, n_struct, n_low) n_struct* draw_get_##n_low(size_t handle) { \
+    assert(handle<reg_shapes.count); \
+    Draw_shape* shape = reg_shapes.shapes+handle; \
+    assert(shape->type == n_enum); \
+    return &shape->shape.n_enum;}
 DRAW_SHAPES
 #undef X
 
@@ -141,7 +149,7 @@ void draw_draw()
     ClearBackground(RAYWHITE);
         BeginMode2D(camera);
             rlScalef(1,-1,1);
-            for (unsigned int i=0; i<reg_shapes.count; i++) {
+            for (size_t i=0; i<reg_shapes.count; i++) {
                 draw_shape(reg_shapes.shapes[i]);
             }
         EndMode2D();

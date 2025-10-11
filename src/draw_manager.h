@@ -1,6 +1,6 @@
 #if !defined(DRAW_MANAGER_H)
 #define DRAW_MANAGER_H
-
+#include <stddef.h>
 #include <stdbool.h>
 
 // X(enum, struct, low-case name)
@@ -38,7 +38,14 @@ typedef struct Draw_Line {
   Draw_Color color;
 } Draw_Line;
 
-#define X(n_enum, n_struct, n_low) n_struct* draw_register_##n_low(n_struct n_low);
+#define X(n_enum, n_struct, n_low) size_t draw_register_##n_low(n_struct n_low);
+DRAW_SHAPES
+#undef X
+
+// Returns a shape pointer. The pointer needs to be cast to a shape to be used.
+// Use more specific `draw_get_*` functions for better saftey.
+void* draw_get_shape(size_t handle);
+#define X(n_enum, n_struct, n_low) n_struct* draw_get_##n_low(size_t handle);
 DRAW_SHAPES
 #undef X
 
