@@ -222,7 +222,7 @@ int construct_get_joint_count(Construct *c) {
 
 void construct_get_joints(Construct *c, Construct_joint* joints, int max_joints) {
     int loop_boundary = b2MinInt(max_joints, c->joint_count);
-    memcpy(joints, c->joints_data, loop_boundary);
+    memcpy(joints, c->joints_data, sizeof joints[0] * loop_boundary);
 }
 
 /* ---------- Mutators ---------- */
