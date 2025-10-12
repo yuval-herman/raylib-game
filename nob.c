@@ -271,9 +271,17 @@ bool compile_test_runner()
     nob_cmd_append(&cmd, "-g", "-O0", "-fsanitize=address,undefined");
 
     nob_cmd_append(&cmd, "-I./tests");
+    nob_cmd_append(&cmd, "-I./" SRC_DIR);
+    nob_cmd_append(&cmd, "-I./" INCLUDE_DIR);
 
     nob_cc_output(&cmd, TESTS_OUTPUT_FILE);
+
     nob_cc_inputs(&cmd, "tests/test-runner.c");
+
+    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
+    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
+    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(PCG_C_LIB));
+    nob_cmd_append(&cmd, "-lm");
 
     return nob_cmd_run(&cmd);
 }

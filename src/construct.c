@@ -17,10 +17,10 @@ typedef struct Construct
     // Used to reduce allocations
     double *brain_inputs;
 
-    Construct_node* nodes_data;
+    Construct_node *nodes_data;
     int node_count;
 
-    Construct_joint* joints_data;
+    Construct_joint *joints_data;
     int joint_count;
 
     b2BodyId *node_ids;
@@ -28,11 +28,6 @@ typedef struct Construct
 } Construct;
 
 /* ---------- Helpers ---------- */
-
-static inline bool valid_construct(const Construct *c)
-{
-    return c != NULL;
-}
 
 b2Vec2 construct_get_center(Construct *construct)
 {
@@ -204,23 +199,28 @@ void construct_destroy(Construct *c)
     c = NULL;
 }
 
-int construct_get_node_count(Construct *c) {
+int construct_get_node_count(Construct *c)
+{
     return c->node_count;
 }
 
-void construct_get_nodes(Construct *c, Construct_node* nodes, int max_nodes) {
+void construct_get_nodes(Construct *c, Construct_node *nodes, int max_nodes)
+{
     int loop_boundary = b2MinInt(max_nodes, c->node_count);
-    for (int i=0; i < loop_boundary; i++) {
+    for (int i = 0; i < loop_boundary; i++)
+    {
         nodes[i].pos = b2Body_GetPosition(c->node_ids[i]);
         nodes[i].radius = c->nodes_data[i].radius;
     }
 }
 
-int construct_get_joint_count(Construct *c) {
+int construct_get_joint_count(Construct *c)
+{
     return c->joint_count;
 }
 
-void construct_get_joints(Construct *c, Construct_joint* joints, int max_joints) {
+void construct_get_joints(Construct *c, Construct_joint *joints, int max_joints)
+{
     int loop_boundary = b2MinInt(max_joints, c->joint_count);
     memcpy(joints, c->joints_data, sizeof joints[0] * loop_boundary);
 }
@@ -254,10 +254,10 @@ int construct_add_node(Construct *c, Construct_node node)
 
     c->node_count++;
     c->node_ids = realloc(c->node_ids, sizeof c->node_ids[0] * c->node_count);
-    c->node_ids[c->node_count-1] = body_id;
+    c->node_ids[c->node_count - 1] = body_id;
 
     c->nodes_data = realloc(c->nodes_data, sizeof c->nodes_data[0] * c->node_count);
-    c->nodes_data[c->node_count-1] = node;
+    c->nodes_data[c->node_count - 1] = node;
 
     log_debug("allocated new node");
     construct_make_unfinished(c);
@@ -276,6 +276,7 @@ int construct_add_joint(Construct *c, Construct_joint joint)
     }
 
     assert(joint.node1_idx >= 0 && joint.node2_idx >= 0);
+    assert(joint.node1_idx != joint.node2_idx);
     assert(joint.node1_idx < c->node_count && joint.node2_idx < c->node_count);
 
     b2DistanceJointDef joint_def = b2DefaultDistanceJointDef();
