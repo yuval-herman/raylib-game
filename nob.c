@@ -43,25 +43,27 @@
         }                                                            \
     } while (0);
 
-#define SUB_COMMANDS(...)          \
-        X(RUN __VA_OPT__(,) __VA_ARGS__)     \
-        X(TEST __VA_OPT__(,) __VA_ARGS__)    \
-        X(COMPILE __VA_OPT__(,) __VA_ARGS__)
+#define SUB_COMMANDS(...)              \
+    X(RUN __VA_OPT__(, ) __VA_ARGS__)  \
+    X(TEST __VA_OPT__(, ) __VA_ARGS__) \
+    X(COMPILE __VA_OPT__(, ) __VA_ARGS__)
 
 typedef enum NobSubcommand
 {
     SUB_UNKNOWN,
-    #define X(cmd) SUB_##cmd,
+#define X(cmd) SUB_##cmd,
     SUB_COMMANDS()
-    #undef X
+#undef X
 } NobSubcommand;
 
 NobSubcommand ssub2enum(const char *command)
 {
-    char* low_command = nob_temp_strdup(str_lower(command));
-    #define X(cmd) if (strcmp(low_command, str_lower(#cmd)) == 0) return SUB_##cmd;
+    char *low_command = nob_temp_strdup(str_lower(command));
+#define X(cmd)                                     \
+    if (strcmp(low_command, str_lower(#cmd)) == 0) \
+        return SUB_##cmd;
     SUB_COMMANDS()
-    #undef X
+#undef X
     return SUB_UNKNOWN;
 }
 
@@ -69,9 +71,11 @@ char *esub2str(NobSubcommand command)
 {
     switch (command)
     {
-    #define X(cmd) case SUB_##cmd: return str_lower(#cmd);
-    SUB_COMMANDS()
-    #undef X
+#define X(cmd)      \
+    case SUB_##cmd: \
+        return str_lower(#cmd);
+        SUB_COMMANDS()
+#undef X
     default:
         // If DNDEBUG isn't set, fail here, if not, fall through to unknown
         assert(false);
@@ -262,7 +266,7 @@ bool compile_main(const BuildFlags flags)
 bool compile_test_runner()
 {
     nob_cc(&cmd);
-    nob_cmd_append(&cmd, "-Wall", "-Wextra", "-Wswitch-enum");
+    nob_cmd_append(&cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Werror");
 
     nob_cmd_append(&cmd, "-g", "-O0", "-fsanitize=address,undefined");
 
@@ -312,7 +316,8 @@ int main(int argc, char **argv)
 
     if (b_flags.sub_command == SUB_TEST)
     {
-        compile_test_runner();
+        if (!compile_test_runner())
+            return 1;
         nob_cmd_append(&cmd, "./" TESTS_OUTPUT_FILE);
         if (!nob_cmd_run(&cmd))
             return 1;
