@@ -11,6 +11,7 @@ typedef enum Draw_shapes {
     #define X(n_enum, n_struct, n_low) n_enum,
     DRAW_SHAPES
     #undef X
+    VOID_SHAPE // Used to signify unused space in shape array
 } Draw_shapes;
 
 typedef union Shapes_union{
@@ -115,6 +116,7 @@ void draw_shape(Draw_shape shape) {
       DrawRectangleRec(rect2r(rect), color2r(rect.color));
     }
     break;
+    case VOID_SHAPE: break;
     default:
         assert(false);
     }
