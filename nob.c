@@ -268,6 +268,7 @@ bool compile_test_runner()
     nob_cc(&cmd);
     nob_cmd_append(&cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Werror");
 
+    nob_cmd_append(&cmd, "-DFUNCTION_ASSERT");
     nob_cmd_append(&cmd, "-g", "-O0", "-fsanitize=address,undefined");
 
     nob_cmd_append(&cmd, "-I./tests");
