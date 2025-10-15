@@ -8,7 +8,6 @@
 #include "painters/construct_painter.c" // not yet tested
 
 #include "../src/construct.c"
-#include "../src/random.c"
 
 // #include "draw-test.c"
 // #include "genann-test.c"
@@ -16,7 +15,7 @@
 // #include "construct-painter-test.c"
 
 // #include "construct-test.c"
-// #include "random-test.c"
+#include "random-test.c"
 #include "utils-test.c"
 
 TAU_MAIN()
