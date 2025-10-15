@@ -4,6 +4,7 @@
 #include "utils.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define SHAPE_ARRAY_INIT 32
 
@@ -21,6 +22,7 @@ typedef union Shapes_union{
 } Shapes_union;
 
 typedef struct Draw_shape {
+    int z_index;
     Draw_shapes type;
     Shapes_union shape;
 } Draw_shape;
@@ -32,15 +34,18 @@ typedef struct Shapes_array {
 } Shapes_array;
 
 Shapes_array reg_shapes = {0};
+Draw_shape* reg_shapes_buffer = {0};
 
 size_t register_shape(Draw_shape shape) {
     if(reg_shapes.capacity==0) {
       reg_shapes.shapes = calloc(SHAPE_ARRAY_INIT, sizeof reg_shapes.shapes[0]);
+      reg_shapes_buffer = calloc(SHAPE_ARRAY_INIT, sizeof reg_shapes.shapes[0]);
       reg_shapes.capacity = SHAPE_ARRAY_INIT;
     }
     if (reg_shapes.capacity<=reg_shapes.count) {
       reg_shapes.capacity *= 2;
       reg_shapes.shapes = realloc(reg_shapes.shapes, sizeof reg_shapes.shapes[0] * reg_shapes.capacity);
+      reg_shapes_buffer = realloc(reg_shapes_buffer, sizeof reg_shapes_buffer[0] * reg_shapes.capacity);
     }
     Draw_shape *new_shape = &reg_shapes.shapes[reg_shapes.count];
     *new_shape = shape;
@@ -48,9 +53,9 @@ size_t register_shape(Draw_shape shape) {
     return reg_shapes.count++;
 }
 
-#define X(n_enum, n_struct, n_low) size_t draw_register_##n_low(n_struct n_low) { \
+#define X(n_enum, n_struct, n_low) size_t draw_register_##n_low(n_struct n_low, int z_index) { \
     log_debug("registering draw "#n_low); \
-    return register_shape((Draw_shape){n_enum, {.n_enum = n_low}});}
+    return register_shape((Draw_shape){.z_index = z_index, .type=n_enum, .shape={.n_enum = n_low}});}
 DRAW_SHAPES
 #undef X
 
@@ -141,18 +146,30 @@ void draw_window_destroy()
 
 bool draw_window_should_close() { return WindowShouldClose(); }
 
+int z_index_cmp (const void* a, const void* b) {
+    Draw_shape arg1 = *(const Draw_shape*)a;
+    Draw_shape arg2 = *(const Draw_shape*)b;
+ 
+    if (arg1.z_index < arg2.z_index) return -1;
+    if (arg1.z_index > arg2.z_index) return 1;
+    return 0;
+}
+
 void draw_draw()
 {
     static Camera2D camera = {.zoom = 10,
        .offset = (Vector2){.x = 500,
        .y = 300}};
 
+    memcpy(reg_shapes_buffer, reg_shapes.shapes, reg_shapes.count * sizeof reg_shapes_buffer[0]);
+    qsort(reg_shapes_buffer, reg_shapes.count, sizeof reg_shapes_buffer[0], z_index_cmp);
+   
     BeginDrawing();
     ClearBackground(RAYWHITE);
         BeginMode2D(camera);
             rlScalef(1,-1,1);
             for (size_t i=0; i<reg_shapes.count; i++) {
-                draw_shape(reg_shapes.shapes[i]);
+                draw_shape(reg_shapes_buffer[i]);
             }
         EndMode2D();
     EndDrawing();

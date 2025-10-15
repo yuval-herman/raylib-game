@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define JOINT_Z_INDEX 99
+#define  NODE_Z_INDEX 100
+
 struct Construct_Painter
 {
     Construct *construct;
@@ -40,14 +43,14 @@ Construct_Painter *construct_painter_make(Construct *construct)
     painter->draw_node_handles = malloc(sizeof(size_t) * painter->node_count);
     for (int i = 0; i < painter->node_count; i++)
     {
-        painter->draw_node_handles[i] = draw_register_circle(DEFAULT_NODE_SHAPE);
+        painter->draw_node_handles[i] = draw_register_circle(DEFAULT_NODE_SHAPE, NODE_Z_INDEX);
     }
 
     // Create lines for joints
     painter->draw_joint_handles = malloc(sizeof(size_t) * painter->joint_count);
     for (int i = 0; i < painter->joint_count; i++)
     {
-        painter->draw_joint_handles[i] = draw_register_line(DEFAULT_JOINT_SHAPE);
+        painter->draw_joint_handles[i] = draw_register_line(DEFAULT_JOINT_SHAPE, JOINT_Z_INDEX);
     }
 
     log_debug("Allocated construct painter");

@@ -38,7 +38,7 @@ typedef struct Draw_Line {
   Draw_Color color;
 } Draw_Line;
 
-#define X(n_enum, n_struct, n_low) size_t draw_register_##n_low(n_struct n_low);
+#define X(n_enum, n_struct, n_low) size_t draw_register_##n_low(n_struct n_low, int z_index);
 DRAW_SHAPES
 #undef X
 

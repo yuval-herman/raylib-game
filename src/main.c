@@ -17,7 +17,7 @@ int main(void)
         .width = GROUND_EXTENT * 2,
         .height = GROUND_HEIGHT,
         .color = {0, 0, 0, 255},
-    });
+    }, 0);
 
     Construct *construct = construct_make(world_id);
     construct_add_node(construct, (Construct_node){1, (b2Vec2){10, 10}});
