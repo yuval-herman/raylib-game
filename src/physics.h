@@ -1,7 +1,6 @@
 #ifndef PHYSICS_HEADER
 #define PHYSICS_HEADER
 
-#include "assert.h"
 #include "box2d.h"
 
 #define TIME_STEP 1.0f / 60.0f

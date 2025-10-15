@@ -1,8 +1,8 @@
 #include "draw_manager.h"
 #include "raylib.h"
 #include "rlgl.h"
-#include "assert.h"
 #include "utils.h"
+#include <assert.h>
 #include <stdlib.h>
 
 #define SHAPE_ARRAY_INIT 32

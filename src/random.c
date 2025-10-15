@@ -2,7 +2,6 @@
 #include "pcg_variants.h"
 
 #include <time.h>
-#include <assert.h>
 #include <stdlib.h>
 #include <math.h>
 

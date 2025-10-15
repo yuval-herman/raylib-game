@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
 #include "math_functions.h"
 #include "utils.h"
