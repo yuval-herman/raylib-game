@@ -77,7 +77,7 @@ char *str_lower(const char *text)
             if ((text[i] >= 'A') && (text[i] <= 'Z')) buffer[i] = text[i] + 32;
             else buffer[i] = text[i];
         }
-    }
+    } else return NULL;
 
     return buffer;
 }
