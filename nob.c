@@ -250,7 +250,8 @@ bool compile_main(const BuildFlags flags)
                   SRC_DIR "genann.c",
                   SRC_DIR "random.c",
                   SRC_DIR "utils.c",
-                  SRC_DIR "painters/construct_painter.c", );
+                  SRC_DIR "painters/construct_painter.c",
+                  SRC_DIR "screen_manager.c");
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(PCG_C_LIB));
