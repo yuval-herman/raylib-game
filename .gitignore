@@ -3,3 +3,4 @@ nob
 .vscode/
 scratch
 scratch.c
+compile_flags.txt
