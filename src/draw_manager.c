@@ -36,12 +36,16 @@ typedef struct Shapes_array {
 Shapes_array reg_shapes = {0};
 Draw_shape* reg_shapes_buffer = {0};
 
-size_t register_shape(Draw_shape shape) {
+void init_reg_shapes() {
     if(reg_shapes.capacity==0) {
       reg_shapes.shapes = calloc(SHAPE_ARRAY_INIT, sizeof reg_shapes.shapes[0]);
       reg_shapes_buffer = calloc(SHAPE_ARRAY_INIT, sizeof reg_shapes.shapes[0]);
       reg_shapes.capacity = SHAPE_ARRAY_INIT;
     }
+}
+
+size_t register_shape(Draw_shape shape) {
+    init_reg_shapes();
     if (reg_shapes.capacity<=reg_shapes.count) {
       reg_shapes.capacity *= 2;
       reg_shapes.shapes = realloc(reg_shapes.shapes, sizeof reg_shapes.shapes[0] * reg_shapes.capacity);
@@ -137,6 +141,8 @@ void draw_window_make()
 
     rlSetCullFace(RL_CULL_FACE_FRONT);
     SetTargetFPS(60);
+
+    init_reg_shapes();
 }
 
 void draw_window_destroy()
