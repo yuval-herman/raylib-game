@@ -41,13 +41,15 @@ typedef struct Draw_Line {
 #define X(n_enum, n_struct, n_low) size_t draw_register_##n_low(n_struct n_low, int z_index);
 DRAW_SHAPES
 #undef X
+#define X(n_enum, n_struct, n_low) n_struct* draw_get_##n_low(size_t handle);
+DRAW_SHAPES
+#undef X
 
 // Returns a shape pointer. The pointer needs to be cast to a shape to be used.
 // Use more specific `draw_get_*` functions for better saftey.
 void* draw_get_shape(size_t handle);
-#define X(n_enum, n_struct, n_low) n_struct* draw_get_##n_low(size_t handle);
-DRAW_SHAPES
-#undef X
+// Remove a shape from the draw list, invalidating handle.
+void draw_remove_shape(size_t handle);
 
 void draw_window_make();
 void draw_window_destroy();
