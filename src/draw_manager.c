@@ -93,6 +93,7 @@ void draw_remove_shape(size_t handle) {
         log_msg(U_LOG_WARN, "attempting shape double free");
         return;
     }
+    log_debug("removing shape at %ld", handle);
     shape->type = VOID_SHAPE;
     reg_shapes.used_count--;
 }
@@ -209,6 +210,8 @@ void draw_draw()
 
     memcpy(reg_shapes_buffer, reg_shapes.shapes, reg_shapes.total_count * sizeof reg_shapes_buffer[0]);
     qsort(reg_shapes_buffer, reg_shapes.total_count, sizeof reg_shapes_buffer[0], z_index_cmp);
+
+    log_debug("starting draw call. drawing %ld shapes out of %ld total shapes and memory reserved for %ld shapes.", reg_shapes.used_count, reg_shapes.total_count, reg_shapes.capacity);
    
     BeginDrawing();
     ClearBackground(RAYWHITE);
