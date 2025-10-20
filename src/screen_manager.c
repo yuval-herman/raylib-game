@@ -5,12 +5,23 @@
 #include "painters/construct_painter.h"
 #include "random.h"
 #include "screens/runner.c"
+#include <assert.h>
+
+
+// declare all function and types for all screens to ensure they exist
+#define X(n_upper, n_lower, init_params) \
+screen_context_##n_lower *screen_init_##n_lower(init_params); \
+void destroy_screen_##n_lower(screen_context_##n_lower *ctx); \
+void screen_draw_##n_lower(screen_context_##n_lower *ctx); \
+void screen_update_##n_lower(screen_context_##n_lower *ctx);
+#include "screens/screens.def"
+#undef X
 
 Game_screen current_screen = 0;
 RandomState *rng;
 Construct *construct;
 b2WorldId world_id;
-Runner_screen_context *ctx_runner;
+screen_context_runner *ctx_runner;
 
 void screen_init() {
   rng = random_make();
@@ -24,11 +35,11 @@ void screen_init() {
   construct_add_joint(construct, (Construct_joint){0, 1, true});
   construct_finalize(construct, rng);
 
-  ctx_runner = init_runner_screen(construct, world_id);
+  ctx_runner = screen_init_runner(construct, world_id);
 }
 
 void screen_destroy() {
-  destroy_runner_screen(ctx_runner);
+  destroy_screen_runner(ctx_runner);
   random_destroy(rng);
   construct_destroy(construct);
   b2DestroyWorld(world_id);
@@ -38,17 +49,25 @@ void set_screen(Game_screen screen) { current_screen = screen; }
 
 void screen_draw() {
   switch (current_screen) {
-  case SCREEN_RUNNER:
-    runner_screen_draw(ctx_runner);
+#define X(n_upper, n_lower, init_params) \
+  case SCREEN_##n_upper: \
+    screen_draw_##n_lower(ctx_##n_lower); \
     break;
+  #include "screens/screens.def"
+  #undef X
+  default: assert(false);
   }
   draw_draw();
 }
 
 void screen_update() {
   switch (current_screen) {
-  case SCREEN_RUNNER:
-    runner_screen_update(ctx_runner);
+#define X(n_upper, n_lower, init_params) \
+  case SCREEN_##n_upper: \
+    screen_update_##n_lower(ctx_##n_lower); \
     break;
+  #include "screens/screens.def"
+  #undef X
+  default: assert(false);
   }
 }

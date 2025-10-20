@@ -2,7 +2,10 @@
 #define SCREEN_MANAGER_H
 
 typedef enum Game_screen {
-  SCREEN_RUNNER,
+#define X(n_upper, n_lower, init_params) \
+SCREEN_##n_upper,
+#include "screens/screens.def"
+#undef X
 } Game_screen;
 
 void screen_init();

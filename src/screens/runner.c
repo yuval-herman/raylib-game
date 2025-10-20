@@ -9,10 +9,10 @@ typedef struct {
   Construct_Painter *painter;
   Construct *construct;
   b2WorldId world_id;
-} Runner_screen_context;
+} screen_context_runner;
 
-Runner_screen_context *init_runner_screen(Construct *construct, b2WorldId world_id) {
-  Runner_screen_context *ctx = malloc(sizeof(Runner_screen_context));
+screen_context_runner *screen_init_runner(Construct *construct, b2WorldId world_id) {
+  screen_context_runner *ctx = malloc(sizeof(screen_context_runner));
 
   draw_register_rectangle(
       (Draw_Rectangle){
@@ -29,16 +29,16 @@ Runner_screen_context *init_runner_screen(Construct *construct, b2WorldId world_
   return ctx;
 }
 
-void destroy_runner_screen(Runner_screen_context *ctx) {
+void destroy_screen_runner(screen_context_runner *ctx) {
   construct_painter_destroy(ctx->painter);
   free(ctx);
 }
 
-void runner_screen_draw(Runner_screen_context *ctx) {
+void screen_draw_runner(screen_context_runner *ctx) {
   construct_painter_update(ctx->painter);
 }
 
-void runner_screen_update(Runner_screen_context *ctx) {
+void screen_update_runner(screen_context_runner *ctx) {
   b2World_Step(ctx->world_id, TIME_STEP, SUB_STEP_COUNT);
   construct_update(ctx->construct, INST_NONE);
 }
