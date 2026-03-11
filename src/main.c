@@ -73,7 +73,6 @@ int main(void) {
 
     DrawRectangleRec(player_rect, RED);
     DrawRectangle(0, 0, 200, 10, BLACK);
-    DrawText(TextFormat("Speed: %f", player_velocity.x), 15, 15, 30, BLACK);
 
     EndDrawing();
   }
