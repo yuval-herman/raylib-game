@@ -5,6 +5,7 @@
 #include <string.h>
 
 #define NOB_WARN_DEPRECATED
+#define NOB_UNSTRIP_PREFIX
 #include "nob.h"
 
 #define SRC_DIR "src/"
