@@ -1,4 +1,3 @@
-
 #include "build_src/libs/box2d-build.h"
 #include "build_src/libs/raylib-build.h"
 #include "build_src/libs/pcg-c-build.h"
@@ -45,7 +44,6 @@
 
 #define SUB_COMMANDS(...)              \
     X(RUN __VA_OPT__(, ) __VA_ARGS__)  \
-    X(TEST __VA_OPT__(, ) __VA_ARGS__) \
     X(COMPILE __VA_OPT__(, ) __VA_ARGS__)
 
 typedef enum NobSubcommand
@@ -90,7 +88,6 @@ typedef struct BuildFlags
     const bool debug;
     const bool optimize;
     const bool force;
-    const bool disable_threads;
     const Flag_List custom_defines;
     const NobSubcommand sub_command;
 } BuildFlags;
@@ -103,7 +100,6 @@ void usage(FILE *stream)
     fprintf(stream, "\nAvailable subcommands are:\n");
     fprintf(stream, "\tcompile (default) - builds the project.\n");
     fprintf(stream, "\trun               - builds the project (if necessary) and runs the output executable.\n");
-    fprintf(stream, "\ttest              - builds the test runner and run it.\n");
     fprintf(stream, "\nOPTIONS:\n");
     flag_print_options(stream);
 }
@@ -115,7 +111,6 @@ BuildFlags parse_flags(int argc, char **argv)
     bool *debug = flag_bool("debug", false, "Compile with debug symbols");
     bool *optimize = flag_bool("optimize", false, "Enable compiler optimizations. This is ignored when used with -debug");
     bool *force = flag_bool("force", false, "Forces rebuild even if files were not updated");
-    bool *disable_threads = flag_bool("disable_threads", false, "Disables multithreading in compiled program");
     Flag_List *custom_defines = flag_list("define", "Define a symbol for the preprocessor, passed directly to the compiler");
     NobSubcommand sub_command = SUB_COMPILE;
 
@@ -143,7 +138,6 @@ BuildFlags parse_flags(int argc, char **argv)
         .debug = *debug,
         .optimize = *optimize,
         .force = *force,
-        .disable_threads = *disable_threads,
         .custom_defines = *custom_defines,
         .sub_command = sub_command,
     };
@@ -225,10 +219,6 @@ bool compile_main(const BuildFlags flags)
     {
         nob_cmd_append(&cmd, nob_temp_sprintf("-D%s", flags.custom_defines.items[i]));
     }
-    if (!flags.disable_threads)
-    {
-        nob_cmd_append(&cmd, "-DENABLE_THREADS=true");
-    }
 
     if (flags.debug)
     {
@@ -242,16 +232,7 @@ bool compile_main(const BuildFlags flags)
     nob_cmd_append(&cmd, "-I./" INCLUDE_DIR);
 
     nob_cc_output(&cmd, OUTPUT_FILE);
-    nob_cc_inputs(&cmd,
-                  SRC_DIR "main.c",
-                  SRC_DIR "draw_manager.c",
-                  SRC_DIR "construct.c",
-                  SRC_DIR "physics.c",
-                  SRC_DIR "genann.c",
-                  SRC_DIR "random.c",
-                  SRC_DIR "utils.c",
-                  SRC_DIR "painters/construct_painter.c",
-                  SRC_DIR "screen_manager.c");
+    nob_cc_inputs(&cmd, SRC_DIR "main.c");
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(PCG_C_LIB));
@@ -260,30 +241,6 @@ bool compile_main(const BuildFlags flags)
 #ifdef _WIN32
     nob_cmd_append(&cmd, "-lopengl32", "-lgdi32", "-lwinmm", "-lshell32");
 #endif
-
-    return nob_cmd_run(&cmd);
-}
-
-bool compile_test_runner()
-{
-    nob_cc(&cmd);
-    nob_cmd_append(&cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-Werror");
-
-    nob_cmd_append(&cmd, "-DFUNCTION_ASSERT");
-    nob_cmd_append(&cmd, "-g", "-O0", "-fsanitize=address,undefined");
-
-    nob_cmd_append(&cmd, "-I./tests");
-    nob_cmd_append(&cmd, "-I./" SRC_DIR);
-    nob_cmd_append(&cmd, "-I./" INCLUDE_DIR);
-
-    nob_cc_output(&cmd, TESTS_OUTPUT_FILE);
-
-    nob_cc_inputs(&cmd, "tests/test-runner.c");
-
-    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
-    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
-    nob_cmd_append(&cmd, BUILD_DIR lib_file_name(PCG_C_LIB));
-    nob_cmd_append(&cmd, "-lm");
 
     return nob_cmd_run(&cmd);
 }
@@ -322,15 +279,6 @@ int main(int argc, char **argv)
             if (!nob_cmd_run(&cmd))
                 return 1;
         }
-    }
-
-    if (b_flags.sub_command == SUB_TEST)
-    {
-        if (!compile_test_runner())
-            return 1;
-        nob_cmd_append(&cmd, "./" TESTS_OUTPUT_FILE);
-        if (!nob_cmd_run(&cmd))
-            return 1;
     }
 
     return 0;

@@ -1,4 +1,0 @@
-#define S(...) __VA_ARGS__
-// name_upper, name_lower, init_params
-X(RUNNER, runner, S(Construct *construct, b2WorldId world_id))
-#undef S
