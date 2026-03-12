@@ -6,7 +6,6 @@
 #define GROUND_LEVEL 0
 #define GRAVITY_LEVEL 1000
 
-
 // --- Player ---
 
 #define DECELERATION 2
@@ -21,7 +20,6 @@
 
 #define PLAYER_WIDTH 20
 #define PLAYER_HEIGHT 20
-
 
 // --- Program ---
 
