@@ -2,6 +2,7 @@
 #include "constants.h"
 #include "raylib.h"
 #include "utils.h"
+#include "input.h"
 #include <math.h>
 #include <stdbool.h>
 
