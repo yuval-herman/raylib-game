@@ -2,6 +2,8 @@
 
 const int GROUND_LEVEL = 0;
 const float GRAVITY_LEVEL = 1000;
+const float JUMP_HANG_GRAVITY_LEVEL = 750;
+const float JUMP_HANG_THRESHOLD = 200;
 const float DECELERATION = 2;
 const int JUMP_POWER = 400;
 const int MOVEMENT_SPEED = 25;
@@ -11,6 +13,12 @@ const float DASH_COOLDOWN = 0.5;
 const float DASH_DURATION = 0.2;
 const int FPS = 60;
 
+const KeyboardKey JUMP_BUTTON = KEY_SPACE;
+const KeyboardKey LEFT_BUTTON = KEY_LEFT;
+const KeyboardKey RIGHT_BUTTON = KEY_RIGHT;
+const KeyboardKey DASH_BUTTON = KEY_LEFT_SHIFT;
+const KeyboardKey SHOW_FPS_BUTTON = KEY_Q;
+
 const int PLAYER_WIDTH = 20;
 const int PLAYER_HEIGHT = 20;
 
@@ -19,6 +27,8 @@ bool isGrounded;
 bool isFacingRight = true;
 float dashCooldown = 0;
 float dashDuration = 0;
+
+bool showFps;
 
 Camera2D camera = {.zoom = 1};
 Rectangle player_rect = {.height = PLAYER_HEIGHT, .width = PLAYER_WIDTH, .y = 2};
@@ -42,12 +52,15 @@ void update_player() {
       isGrounded = true;
       canDoubleJump = true;
     } else { // Isn't grounded
-      player_velocity.y += GRAVITY_LEVEL * frameTime;
+      if (player_velocity.y > JUMP_HANG_THRESHOLD || player_velocity.y < 0)
+        player_velocity.y += GRAVITY_LEVEL * frameTime;
+      else
+        player_velocity.y += JUMP_HANG_GRAVITY_LEVEL * frameTime;
       isGrounded = false;
     }
 
     // Jump
-    if (IsKeyPressed(KEY_SPACE)) {
+    if (IsKeyPressed(JUMP_BUTTON)) {
       if (isGrounded)
           player_velocity.y = -JUMP_POWER;
       else if (canDoubleJump) {
@@ -55,18 +68,18 @@ void update_player() {
           canDoubleJump = false;
       }
     }
-    if (IsKeyReleased(KEY_SPACE) && player_velocity.y < 0)
+    if (IsKeyReleased(JUMP_BUTTON) && player_velocity.y < 0)
     {
       player_velocity.y *= 0.5;
     }
 
     // Move
-    if (IsKeyDown(KEY_LEFT)) {
+    if (IsKeyDown(LEFT_BUTTON)) {
       player_velocity.x -= MOVEMENT_SPEED;
       if (player_velocity.x < - MAX_MOVEMENT_SPEED) player_velocity.x = -MAX_MOVEMENT_SPEED;
       if (isFacingRight) player_rect.width = -PLAYER_WIDTH;
       isFacingRight = false;
-    } else if (IsKeyDown(KEY_RIGHT)) {
+    } else if (IsKeyDown(RIGHT_BUTTON)) {
       player_velocity.x += MOVEMENT_SPEED;
       if (player_velocity.x > MAX_MOVEMENT_SPEED) player_velocity.x = MAX_MOVEMENT_SPEED;
       if (!isFacingRight) player_rect.width = PLAYER_WIDTH;
@@ -78,12 +91,14 @@ void update_player() {
   }
 
   // Dash
-  if (IsKeyPressed(KEY_LEFT_SHIFT) && dashCooldown <= 0) {
+  if (IsKeyPressed(DASH_BUTTON) && dashCooldown <= 0) {
     player_velocity.x += DASH_POWER * (isFacingRight ? 1 : -1);
     player_velocity.y = 0;
     dashCooldown = DASH_COOLDOWN;
     dashDuration = DASH_DURATION;
   }
+
+  if (IsKeyPressed(SHOW_FPS_BUTTON)) showFps = !showFps;
 
   player_rect.x += player_velocity.x * frameTime;
   player_rect.y += player_velocity.y * frameTime;
@@ -114,6 +129,11 @@ int main(void) {
     Rectangle source = { 0, 0, player_rect.width, player_rect.height };
     DrawTextureRec(LoadTextureFromImage(LoadImage("Sprites/raylibGamePlayer.png")), source, (Vector2){player_rect.x, player_rect.y}, WHITE);
     DrawRectangle(0, 0, 200, 10, BLACK);
+
+    EndMode2D();
+
+    // UI
+    if (showFps) DrawText(TextFormat("%d", GetFPS()), 15, 15, 30, BLACK);
 
     EndDrawing();
   }
