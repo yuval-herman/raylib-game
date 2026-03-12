@@ -11,6 +11,15 @@ void update_camera(float player_x, float player_y) {
   camera.target.y = player_y;
 }
 
+void show_debug_menu() {
+  DrawFPS(10, 20);
+  DrawText(TextFormat("Position: x: %.2f, y: %.2f", player_get_rect().x, player_get_rect().y), 10, 40, 20, BLACK);
+  DrawText(TextFormat("Velocity: x: %.2f, y: %.2f", player_get_velocity().x, player_get_velocity().y), 10, 60, 20, BLACK);
+  DrawText(TextFormat("Direction: %s", player_get_is_facing_right() == 1 ? "Right" : "Left"), 10, 80, 20, BLACK);
+  DrawText(TextFormat("Can dash: %s", player_get_dash_cooldown() == 0 ? "true" : "false"), 10, 100, 20, BLACK);
+  DrawText(TextFormat("Can double jump: %s", player_get_can_double_jump() ? "true" : "false"), 10, 120, 20, BLACK);
+}
+
 int main(void) {
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
   InitWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "our game");
@@ -47,13 +56,4 @@ int main(void) {
     EndDrawing();
   }
   return 0;
-}
-
-void show_debug_menu() {
-  DrawFPS(10, 20);
-  DrawText(TextFormat("Position: x: %.2f, y: %.2f", player_get_rect().x, player_get_rect().y), 10, 40, 20, BLACK);
-  DrawText(TextFormat("Velocity: x: %.2f, y: %.2f", player_get_velocity().x, player_get_velocity().y), 10, 60, 20, BLACK);
-  DrawText(TextFormat("Direction: %s", player_get_is_facing_right() == 1 ? "Right" : "Left"), 10, 80, 20, BLACK);
-  DrawText(TextFormat("Can dash: %s", player_get_dash_cooldown() == 0 ? "true" : "false"), 10, 100, 20, BLACK);
-  DrawText(TextFormat("Can double jump: %s", player_get_can_double_jump() ? "true" : "false"), 10, 120, 20, BLACK);
 }
