@@ -90,7 +90,7 @@ bool isOneKeyReleased(const KeyboardKey *keys, int keys_length) {
   return false;
 }
 
-void update_jump(float deltaTime) {
+void update_jump() {
   if (isOneKeyPressed(JUMP_BUTTONS, ARRAY_LEN(JUMP_BUTTONS))) {
     if (isGrounded)
       player_velocity.y = -JUMP_POWER;
@@ -104,7 +104,7 @@ void update_jump(float deltaTime) {
   }
 }
 
-void update_move(float deltaTime) {
+void update_move() {
   if (isOneKeyDown(GO_LEFT_BUTTONS, ARRAY_LEN(GO_LEFT_BUTTONS))) {
     player_velocity.x -= MOVEMENT_SPEED;
     direction = DIRECTION_LEFT;
@@ -125,8 +125,8 @@ void player_update(float deltaTime) {
 
   if (dashDuration <= 0) {
     update_gravity(deltaTime);
-    update_jump(deltaTime);
-    update_move(deltaTime);
+    update_jump();
+    update_move();
   }
 
   player_rect.x += player_velocity.x * deltaTime;
