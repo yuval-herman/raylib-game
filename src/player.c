@@ -36,8 +36,16 @@ void player_draw() {
   static Rectangle drawRect = {
       .height = PLAYER_HEIGHT, .width = PLAYER_WIDTH, .x = 0, .y = 0};
   drawRect.width = PLAYER_WIDTH * direction;
+  Color tint = WHITE;
+
+  // Tint the player when dash is unavailable
+  if (dashCooldown > 0) {
+    tint.r *= (1 - 0.5 * dashCooldown / DASH_COOLDOWN);
+    tint.g *= (1 - 0.5 * dashCooldown / DASH_COOLDOWN);
+    tint.b *= (1 - 0.5 * dashCooldown / DASH_COOLDOWN);
+  }
   DrawTextureRec(player_texture, drawRect,
-                 (Vector2){player_rect.x, player_rect.y}, WHITE);
+                 (Vector2){player_rect.x, player_rect.y}, tint);
 }
 void update_cooldowns(float deltaTime) {
   if (dashCooldown > 0)
