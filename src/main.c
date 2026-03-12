@@ -17,12 +17,13 @@ int main(void) {
 
   SetTargetFPS(FPS);
   bool showDebugMenu;
+  Rectangle platform = {50, -30, 100, 10};
 
   player_init();
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
-    player_update(deltaTime);
+    player_update(deltaTime, platform);
     const Rectangle player_rect = player_get_rect();
     update_camera(player_rect.x, player_rect.y);
 
@@ -35,6 +36,7 @@ int main(void) {
 
     player_draw();
     DrawRectangle(0, GROUND_LEVEL, 200, 10, BLACK);
+    DrawRectangle(platform.x, platform.y, platform.width, platform.height, GREEN);
 
     EndMode2D();
 
