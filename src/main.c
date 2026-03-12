@@ -12,12 +12,31 @@ void update_camera(float player_x, float player_y) {
 }
 
 void show_debug_menu() {
-  DrawFPS(10, 20);
-  DrawText(TextFormat("Position: x: %.2f, y: %.2f", player_get_rect().x, player_get_rect().y), 10, 40, 20, BLACK);
-  DrawText(TextFormat("Velocity: x: %.2f, y: %.2f", player_get_velocity().x, player_get_velocity().y), 10, 60, 20, BLACK);
-  DrawText(TextFormat("Direction: %s", player_get_is_facing_right() == 1 ? "Right" : "Left"), 10, 80, 20, BLACK);
-  DrawText(TextFormat("Can dash: %s", player_get_dash_cooldown() == 0 ? "true" : "false"), 10, 100, 20, BLACK);
-  DrawText(TextFormat("Can double jump: %s", player_get_can_double_jump() ? "true" : "false"), 10, 120, 20, BLACK);
+  const Rectangle player_rect = player_get_rect();
+  const int font_size = 20;
+  const int x_offset = 10;
+  int y_offset = 10;
+  DrawFPS(x_offset, y_offset);
+
+  DrawText(
+      TextFormat("Position: x: %.2f, y: %.2f", player_rect.x, player_rect.y),
+      x_offset, y_offset += font_size, font_size, BLACK);
+
+  DrawText(TextFormat("Velocity: x: %.2f, y: %.2f", player_get_velocity().x,
+                      player_get_velocity().y),
+           x_offset, y_offset += font_size, font_size, BLACK);
+
+  DrawText(TextFormat("Direction: %s",
+                      player_get_is_facing_right() == 1 ? "Right" : "Left"),
+           x_offset, y_offset += font_size, font_size, BLACK);
+
+  DrawText(TextFormat("Can dash: %s",
+                      player_get_dash_cooldown() == 0 ? "true" : "false"),
+           x_offset, y_offset += font_size, font_size, BLACK);
+
+  DrawText(TextFormat("Can double jump: %s",
+                      player_get_can_double_jump() ? "true" : "false"),
+           x_offset, y_offset += font_size, font_size, BLACK);
 }
 
 int main(void) {
@@ -32,8 +51,10 @@ int main(void) {
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
+
     player_update(deltaTime, platform);
     const Rectangle player_rect = player_get_rect();
+
     update_camera(player_rect.x, player_rect.y);
 
     if (IsKeyPressed(SHOW_DEBUG_MENU_BUTTON))
@@ -41,11 +62,13 @@ int main(void) {
 
     BeginDrawing();
     BeginMode2D(camera);
+
     ClearBackground(RAYWHITE);
 
     player_draw();
     DrawRectangle(0, GROUND_LEVEL, 200, 10, BLACK);
-    DrawRectangle(platform.x, platform.y, platform.width, platform.height, GREEN);
+    DrawRectangle(platform.x, platform.y, platform.width, platform.height,
+                  GREEN);
 
     EndMode2D();
 
