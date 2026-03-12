@@ -3,7 +3,7 @@
 
 // --- Global entities ---
 
-#define GROUND_LEVEL 0
+#define GROUND_LEVEL 20
 #define GRAVITY_LEVEL 1000
 
 // --- Player ---
@@ -29,6 +29,6 @@
 
 // --- Keys ---
 
-#define SHOW_FPS_BUTTON KEY_Q
+#define SHOW_DEBUG_MENU_BUTTON KEY_F5
 
 #endif // CONSTANTS_H

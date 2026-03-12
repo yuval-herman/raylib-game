@@ -44,7 +44,7 @@ void update_cooldowns(float deltaTime) {
 
 void update_dash() {
   if (IsKeyPressed(DASH_BUTTON) && dashCooldown <= 0) {
-    player_velocity.x += DASH_POWER * direction;
+    player_velocity.x = DASH_POWER * direction;
     player_velocity.y = 0;
     dashCooldown = DASH_COOLDOWN;
     dashDuration = DASH_DURATION;
@@ -135,4 +135,10 @@ void player_update(float deltaTime) {
 
 Rectangle player_get_rect() { return player_rect; }
 
-float player_get_speed() { return player_velocity.x; }
+Vector2 player_get_velocity() { return player_velocity; }
+
+int player_get_is_facing_right() { return direction; }
+
+float player_get_dash_cooldown() { return dashCooldown >= 0 ? dashCooldown : 0; }
+
+int player_get_can_double_jump() { return canDoubleJump; }

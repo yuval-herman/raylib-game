@@ -6,6 +6,9 @@ void player_init();
 void player_update(float deltaTime);
 void player_draw();
 Rectangle player_get_rect();
-float player_get_speed();
+Vector2 player_get_velocity();
+int player_get_is_facing_right();
+float player_get_dash_cooldown();
+int player_get_can_double_jump();
 
 #endif // PLAYER_H

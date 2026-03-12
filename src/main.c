@@ -16,7 +16,7 @@ int main(void) {
   InitWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "our game");
 
   SetTargetFPS(FPS);
-  bool showFps;
+  bool showDebugMenu;
 
   player_init();
 
@@ -26,25 +26,32 @@ int main(void) {
     const Rectangle player_rect = player_get_rect();
     update_camera(player_rect.x, player_rect.y);
 
-    if (IsKeyPressed(SHOW_FPS_BUTTON))
-      showFps = !showFps;
+    if (IsKeyPressed(SHOW_DEBUG_MENU_BUTTON))
+      showDebugMenu = !showDebugMenu;
 
     BeginDrawing();
     BeginMode2D(camera);
     ClearBackground(RAYWHITE);
 
     player_draw();
-    DrawRectangle(0, 0, 200, 10, BLACK);
+    DrawRectangle(0, GROUND_LEVEL, 200, 10, BLACK);
 
     EndMode2D();
 
     // UI
-    if (showFps)
-      DrawFPS(15, 15);
-
-    DrawText(TextFormat("%f", player_get_speed()), 15, 30, 30, BLACK);
+    if (showDebugMenu)
+      show_debug_menu();
 
     EndDrawing();
   }
   return 0;
+}
+
+void show_debug_menu() {
+  DrawFPS(10, 20);
+  DrawText(TextFormat("Position: x: %.2f, y: %.2f", player_get_rect().x, player_get_rect().y), 10, 40, 20, BLACK);
+  DrawText(TextFormat("Velocity: x: %.2f, y: %.2f", player_get_velocity().x, player_get_velocity().y), 10, 60, 20, BLACK);
+  DrawText(TextFormat("Direction: %s", player_get_is_facing_right() == 1 ? "Right" : "Left"), 10, 80, 20, BLACK);
+  DrawText(TextFormat("Can dash: %s", player_get_dash_cooldown() == 0 ? "true" : "false"), 10, 100, 20, BLACK);
+  DrawText(TextFormat("Can double jump: %s", player_get_can_double_jump() ? "true" : "false"), 10, 120, 20, BLACK);
 }
