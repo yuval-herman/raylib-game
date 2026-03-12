@@ -84,30 +84,6 @@ void update_gravity(float deltaTime, Rectangle ground) {
   }
 }
 
-bool isOneKeyPressed(const KeyboardKey *keys, int keys_length) {
-  for (int i = 0; i < keys_length; ++i) {
-    if (IsKeyPressed(keys[i]))
-      return true;
-  }
-  return false;
-}
-
-bool isOneKeyDown(const KeyboardKey *keys, int keys_length) {
-  for (int i = 0; i < keys_length; ++i) {
-    if (IsKeyDown(keys[i]))
-      return true;
-  }
-  return false;
-}
-
-bool isOneKeyReleased(const KeyboardKey *keys, int keys_length) {
-  for (int i = 0; i < keys_length; ++i) {
-    if (IsKeyReleased(keys[i]))
-      return true;
-  }
-  return false;
-}
-
 void update_jump() {
   if (isOneKeyPressed(JUMP_BUTTONS, ARRAY_LEN(JUMP_BUTTONS))) {
     if (isGrounded)
@@ -117,7 +93,9 @@ void update_jump() {
       canDoubleJump = false;
     }
   }
-  if (isOneKeyReleased(JUMP_BUTTONS, ARRAY_LEN(JUMP_BUTTONS)) && player_velocity.y < 0) {
+  // Shorten jump height if jump button is released
+  if (isOneKeyReleased(JUMP_BUTTONS, ARRAY_LEN(JUMP_BUTTONS)) &&
+      player_velocity.y < 0) {
     player_velocity.y *= 0.5;
   }
 }

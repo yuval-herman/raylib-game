@@ -2,6 +2,8 @@
 #define _UTILS_H
 
 #include <assert.h>
+#include <stdbool.h>
+#include "raylib.h"
 
 #define ARRAY_LEN(array) (sizeof(array) / sizeof(array[0]))
 
@@ -29,4 +31,10 @@ void log_msg(LOG_LEVEL level, const char *fmt, ...);
 
 // Lowers the case for a string. Uses internal buffer of `STR_BUF_LEN`
 char *str_lower(const char *text);
+
+bool isOneKeyPressed(const KeyboardKey *keys, int keys_length);
+
+bool isOneKeyDown(const KeyboardKey *keys, int keys_length);
+
+bool isOneKeyReleased(const KeyboardKey *keys, int keys_length);
 #endif // _UTILS_H
