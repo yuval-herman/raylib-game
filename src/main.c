@@ -1,133 +1,38 @@
+#include "player.h"
 #include "raylib.h"
+#include "constants.h"
 
-const int GROUND_LEVEL = 0;
-const float GRAVITY_LEVEL = 1000;
-const float JUMP_HANG_GRAVITY_LEVEL = 750;
-const float JUMP_HANG_THRESHOLD = 200;
-const float DECELERATION = 2;
-const int JUMP_POWER = 400;
-const int MOVEMENT_SPEED = 25;
-const int MAX_MOVEMENT_SPEED = 300;
-const int DASH_POWER = 500;
-const float DASH_COOLDOWN = 0.5;
-const float DASH_DURATION = 0.2;
-const int FPS = 60;
-
-const KeyboardKey JUMP_BUTTON = KEY_SPACE;
-const KeyboardKey LEFT_BUTTON = KEY_LEFT;
-const KeyboardKey RIGHT_BUTTON = KEY_RIGHT;
-const KeyboardKey DASH_BUTTON = KEY_LEFT_SHIFT;
-const KeyboardKey SHOW_FPS_BUTTON = KEY_Q;
-
-const int PLAYER_WIDTH = 20;
-const int PLAYER_HEIGHT = 20;
-
-bool canDoubleJump;
-bool isGrounded;
-bool isFacingRight = true;
-float dashCooldown = 0;
-float dashDuration = 0;
-
-bool showFps;
 
 Camera2D camera = {.zoom = 1};
-Rectangle player_rect = {.height = PLAYER_HEIGHT, .width = PLAYER_WIDTH, .y = 2};
-Vector2 player_velocity = {0};
 
-void update_camera() {
+void update_camera(float player_x, float player_y) {
   camera.offset.x = GetScreenWidth() / 2.0;
   camera.offset.y = GetScreenHeight() / 2.0;
-  camera.target.x = player_rect.x;
-  camera.target.y = player_rect.y;
-}
-
-void update_player() {
-  float frameTime = GetFrameTime();
-
-  if (dashDuration <= 0) {  
-    // Gravity
-    if (player_rect.y >= GROUND_LEVEL - player_rect.height) { // Is grounded
-      player_rect.y = GROUND_LEVEL - player_rect.height;
-      player_velocity.y = 0;
-      isGrounded = true;
-      canDoubleJump = true;
-    } else { // Isn't grounded
-      if (player_velocity.y > JUMP_HANG_THRESHOLD || player_velocity.y < 0)
-        player_velocity.y += GRAVITY_LEVEL * frameTime;
-      else
-        player_velocity.y += JUMP_HANG_GRAVITY_LEVEL * frameTime;
-      isGrounded = false;
-    }
-
-    // Jump
-    if (IsKeyPressed(JUMP_BUTTON)) {
-      if (isGrounded)
-          player_velocity.y = -JUMP_POWER;
-      else if (canDoubleJump) {
-          player_velocity.y = -JUMP_POWER;
-          canDoubleJump = false;
-      }
-    }
-    if (IsKeyReleased(JUMP_BUTTON) && player_velocity.y < 0)
-    {
-      player_velocity.y *= 0.5;
-    }
-
-    // Move
-    if (IsKeyDown(LEFT_BUTTON)) {
-      player_velocity.x -= MOVEMENT_SPEED;
-      if (player_velocity.x < - MAX_MOVEMENT_SPEED) player_velocity.x = -MAX_MOVEMENT_SPEED;
-      if (isFacingRight) player_rect.width = -PLAYER_WIDTH;
-      isFacingRight = false;
-    } else if (IsKeyDown(RIGHT_BUTTON)) {
-      player_velocity.x += MOVEMENT_SPEED;
-      if (player_velocity.x > MAX_MOVEMENT_SPEED) player_velocity.x = MAX_MOVEMENT_SPEED;
-      if (!isFacingRight) player_rect.width = PLAYER_WIDTH;
-      isFacingRight = true;
-    }
-    else {
-      player_velocity.x /= DECELERATION;
-    }
-  }
-
-  // Dash
-  if (IsKeyPressed(DASH_BUTTON) && dashCooldown <= 0) {
-    player_velocity.x += DASH_POWER * (isFacingRight ? 1 : -1);
-    player_velocity.y = 0;
-    dashCooldown = DASH_COOLDOWN;
-    dashDuration = DASH_DURATION;
-  }
-
-  if (IsKeyPressed(SHOW_FPS_BUTTON)) showFps = !showFps;
-
-  player_rect.x += player_velocity.x * frameTime;
-  player_rect.y += player_velocity.y * frameTime;
-}
-
-void update_cooldowns()
-{
-  float frameTime = GetFrameTime();
-  if (dashCooldown > 0) dashCooldown -= frameTime;
-  if (dashDuration > 0) dashDuration -= frameTime;
+  camera.target.x = player_x;
+  camera.target.y = player_y;
 }
 
 int main(void) {
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
-  InitWindow(800, 600, "our game");
+  InitWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "our game");
 
   SetTargetFPS(FPS);
+  const Texture2D player_texture = LoadTextureFromImage(LoadImage("Sprites/raylibGamePlayer.png"));
+bool showFps;
 
   while (!WindowShouldClose()) {
-    update_camera();
     update_player();
-    update_cooldowns();
+    const Rectangle player_rect = get_player_rect();
+    update_camera(player_rect.x, player_rect.y);
+
+  if (IsKeyPressed(SHOW_FPS_BUTTON)) showFps = !showFps;
 
     BeginDrawing();
     BeginMode2D(camera);
     ClearBackground(RAYWHITE);
 
     Rectangle source = { 0, 0, player_rect.width, player_rect.height };
-    DrawTextureRec(LoadTextureFromImage(LoadImage("Sprites/raylibGamePlayer.png")), source, (Vector2){player_rect.x, player_rect.y}, WHITE);
+    DrawTextureRec(player_texture, source, (Vector2){player_rect.x, player_rect.y}, WHITE);
     DrawRectangle(0, 0, 200, 10, BLACK);
 
     EndMode2D();
