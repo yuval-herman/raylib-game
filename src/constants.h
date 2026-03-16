@@ -21,6 +21,11 @@
 #define PLAYER_WIDTH 20
 #define PLAYER_HEIGHT 20
 
+// --- Physics ---
+
+#define TIME_STEP (1.0f / 60.0f)
+#define SUB_STEP_COUNT (4)
+
 // --- Program ---
 
 #define FPS 60

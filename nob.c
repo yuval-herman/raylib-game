@@ -236,6 +236,7 @@ bool compile_main(const BuildFlags flags)
     nob_cc_inputs(&cmd, SRC_DIR "player.c");
     nob_cc_inputs(&cmd, SRC_DIR "utils.c");
     nob_cc_inputs(&cmd, SRC_DIR "input.c");
+    nob_cc_inputs(&cmd, SRC_DIR "physics.c");
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(BOX2D_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(RAYLIB_LIB));
     nob_cmd_append(&cmd, BUILD_DIR lib_file_name(PCG_C_LIB));

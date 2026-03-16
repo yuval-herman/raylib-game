@@ -33,6 +33,7 @@ Texture2D player_texture;
 void player_init() {
   player_texture = LoadTexture("Sprites/raylibGamePlayer.png");
 }
+
 void player_draw() {
   static Rectangle drawRect = {
       .height = PLAYER_HEIGHT, .width = PLAYER_WIDTH, .x = 0, .y = 0};
