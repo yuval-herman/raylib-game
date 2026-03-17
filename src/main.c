@@ -13,15 +13,15 @@ void update_camera(float player_x, float player_y) {
 }
 
 void show_debug_menu() {
-  const Rectangle player_rect = player_get_rect();
+  Vector2 player_position = player_get_postion();
   const int font_size = 20;
   const int x_offset = 10;
   int y_offset = 10;
   DrawFPS(x_offset, y_offset);
 
-  DrawText(
-      TextFormat("Position: x: %.2f, y: %.2f", player_rect.x, player_rect.y),
-      x_offset, y_offset += font_size, font_size, BLACK);
+  DrawText(TextFormat("Position: x: %.2f, y: %.2f", player_position.x,
+                      player_position.y),
+           x_offset, y_offset += font_size, font_size, BLACK);
 
   DrawText(TextFormat("Velocity: x: %.2f, y: %.2f", player_get_velocity().x,
                       player_get_velocity().y),
@@ -54,15 +54,14 @@ int main(void) {
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
 
-
     player_update(deltaTime, platform);
-    const Rectangle player_rect = player_get_rect();
+    Vector2 player_position = player_get_postion();
 
-    update_camera(player_rect.x, player_rect.y);
+    update_camera(player_position.x, player_position.y);
     phys_step();
 
     // ---------------------
-    
+
     BeginDrawing();
     BeginMode2D(camera);
 

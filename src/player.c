@@ -1,5 +1,8 @@
 #include "player.h"
+#include "box2d.h"
 #include "constants.h"
+#include "math_functions.h"
+#include "physics.h"
 #include "raylib.h"
 #include "utils.h"
 #include "input.h"
@@ -17,15 +20,20 @@ static Direction direction = 1;
 static float dashCooldown = 0;
 static float dashDuration = 0;
 
-static Vector2 player_velocity = {0};
-
-static Rectangle player_rect = {
-    .height = PLAYER_HEIGHT, .width = PLAYER_WIDTH, .y = 2};
-
+static b2BodyId player_id = {0};
+  
 Texture2D player_texture;
 
 void player_init() {
   player_texture = LoadTexture("Sprites/raylibGamePlayer.png");
+
+  b2BodyDef bodyDef = b2DefaultBodyDef();
+  bodyDef.type = b2_kinematicBody;
+  player_id = b2CreateBody(worldId, &bodyDef);
+
+  b2ShapeDef shapeDef = b2DefaultShapeDef();
+  b2Polygon polygon = b2MakeBox(PLAYER_WIDTH / 2.0f, PLAYER_HEIGHT / 2.0f);
+  b2CreatePolygonShape(player_id, &shapeDef, &polygon);
 }
 
 void player_draw() {
@@ -41,8 +49,9 @@ void player_draw() {
     tint.b *= (1 - 0.5 * dashCooldown / DASH_COOLDOWN);
   }
 
-  DrawTextureRec(player_texture, drawRect,
-                 (Vector2){player_rect.x, player_rect.y}, tint);
+  b2Vec2 play_pos = b2Body_GetPosition(player_id);
+
+  DrawTextureRec(player_texture, drawRect, B2RV2(play_pos), tint);
 }
 
 void update_cooldowns(float deltaTime) {
@@ -54,17 +63,22 @@ void update_cooldowns(float deltaTime) {
 
 void update_dash() {
   if (IsKeyPressed(DASH_BUTTON) && dashCooldown <= 0) {
-    player_velocity.x = DASH_POWER * direction;
-    player_velocity.y = 0;
+    b2Body_SetLinearVelocity(player_id,
+                             (b2Vec2){.x = DASH_POWER * direction, .y = 0});
     dashCooldown = DASH_COOLDOWN;
     dashDuration = DASH_DURATION;
   }
 }
 
 void update_gravity(float deltaTime, Rectangle ground) {
-  if (player_rect.y >= GROUND_LEVEL - player_rect.height) { // Is grounded
-    if (player_rect.y >= GROUND_LEVEL - player_rect.height) player_rect.y = GROUND_LEVEL - player_rect.height;
-    else player_rect.y = ground.y - player_rect.height;
+  b2Vec2 player_position = b2Body_GetPosition(player_id);
+  b2Vec2 player_velocity = b2Body_GetLinearVelocity(player_id);
+
+  if (player_position.y >= GROUND_LEVEL - PLAYER_HEIGHT) { // Is grounded
+    if (player_position.y >= GROUND_LEVEL - PLAYER_HEIGHT)
+      player_position.y = GROUND_LEVEL - PLAYER_HEIGHT;
+    else
+      player_position.y = ground.y - PLAYER_HEIGHT;
     player_velocity.y = 0;
     isGrounded = true;
     canDoubleJump = true;
@@ -75,9 +89,11 @@ void update_gravity(float deltaTime, Rectangle ground) {
       player_velocity.y += JUMP_HANG_GRAVITY_LEVEL * deltaTime;
     isGrounded = false;
   }
+  b2Body_SetLinearVelocity(player_id, player_velocity);
 }
 
 void update_jump() {
+  b2Vec2 player_velocity = b2Body_GetLinearVelocity(player_id);
   if (isOneKeyPressed(JUMP_BUTTONS, ARRAY_LEN(JUMP_BUTTONS))) {
     if (isGrounded)
       player_velocity.y = -JUMP_POWER;
@@ -91,9 +107,12 @@ void update_jump() {
       player_velocity.y < 0) {
     player_velocity.y *= 0.5;
   }
+
+  b2Body_SetLinearVelocity(player_id, player_velocity);
 }
 
 void update_move() {
+  b2Vec2 player_velocity = b2Body_GetLinearVelocity(player_id);
   if (isOneKeyDown(GO_LEFT_BUTTONS, ARRAY_LEN(GO_LEFT_BUTTONS))) {
     player_velocity.x -= MOVEMENT_SPEED;
     direction = DIRECTION_LEFT;
@@ -106,6 +125,7 @@ void update_move() {
 
   if (fabsf(player_velocity.x) > MAX_MOVEMENT_SPEED)
     player_velocity.x = MAX_MOVEMENT_SPEED * direction;
+  b2Body_SetLinearVelocity(player_id, player_velocity);
 }
 
 void player_update(float deltaTime, Rectangle ground) {
@@ -118,13 +138,13 @@ void player_update(float deltaTime, Rectangle ground) {
     update_move();
   }
 
-  player_rect.x += player_velocity.x * deltaTime;
-  player_rect.y += player_velocity.y * deltaTime;
+  // player_rect.x += player_velocity.x * deltaTime;
+  // player_rect.y += player_velocity.y * deltaTime;
 }
 
-Rectangle player_get_rect() { return player_rect; }
+Vector2 player_get_velocity() { return B2RV2(b2Body_GetLinearVelocity(player_id)); }
 
-Vector2 player_get_velocity() { return player_velocity; }
+Vector2 player_get_postion() {return B2RV2(b2Body_GetPosition(player_id));}
 
 int player_get_is_facing_right() { return direction; }
 
