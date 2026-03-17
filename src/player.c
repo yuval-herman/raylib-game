@@ -3,8 +3,6 @@
 #include "raylib.h"
 #include "utils.h"
 #include "input.h"
-#include <math.h>
-#include <stdbool.h>
 
 const KeyboardKey JUMP_BUTTONS[] = {KEY_SPACE, KEY_UP, KEY_W};
 const KeyboardKey GO_LEFT_BUTTONS[] = {KEY_LEFT, KEY_A};
@@ -23,10 +21,6 @@ static Vector2 player_velocity = {0};
 
 static Rectangle player_rect = {
     .height = PLAYER_HEIGHT, .width = PLAYER_WIDTH, .y = 2};
-Rectangle player_feet = { .height = 1, .width = PLAYER_WIDTH - 2 };
-Rectangle player_head = { .height = 1, .width = PLAYER_WIDTH - 2 };
-Rectangle player_left = { .height = PLAYER_HEIGHT - 1, .width = 1 };
-Rectangle player_right = { .height = PLAYER_HEIGHT - 1, .width = 1 };
 
 Texture2D player_texture;
 
@@ -46,9 +40,11 @@ void player_draw() {
     tint.g *= (1 - 0.5 * dashCooldown / DASH_COOLDOWN);
     tint.b *= (1 - 0.5 * dashCooldown / DASH_COOLDOWN);
   }
+
   DrawTextureRec(player_texture, drawRect,
                  (Vector2){player_rect.x, player_rect.y}, tint);
 }
+
 void update_cooldowns(float deltaTime) {
   if (dashCooldown > 0)
     dashCooldown -= deltaTime;
@@ -66,7 +62,7 @@ void update_dash() {
 }
 
 void update_gravity(float deltaTime, Rectangle ground) {
-  if (player_rect.y >= GROUND_LEVEL - player_rect.height || CheckCollisionRecs(player_feet, ground)) { // Is grounded
+  if (player_rect.y >= GROUND_LEVEL - player_rect.height) { // Is grounded
     if (player_rect.y >= GROUND_LEVEL - player_rect.height) player_rect.y = GROUND_LEVEL - player_rect.height;
     else player_rect.y = ground.y - player_rect.height;
     player_velocity.y = 0;
@@ -78,11 +74,6 @@ void update_gravity(float deltaTime, Rectangle ground) {
     else
       player_velocity.y += JUMP_HANG_GRAVITY_LEVEL * deltaTime;
     isGrounded = false;
-
-    if (CheckCollisionRecs(player_head, ground)) {
-      player_velocity.y = 0;
-      player_rect.y = ground.y + ground.height;
-    }
   }
 }
 
@@ -102,15 +93,13 @@ void update_jump() {
   }
 }
 
-void update_move(Rectangle ground) {
+void update_move() {
   if (isOneKeyDown(GO_LEFT_BUTTONS, ARRAY_LEN(GO_LEFT_BUTTONS))) {
     player_velocity.x -= MOVEMENT_SPEED;
     direction = DIRECTION_LEFT;
-    if (CheckCollisionRecs(player_left, ground)) player_velocity.x = 0;
   } else if (isOneKeyDown(GO_RIGHT_BUTTONS, ARRAY_LEN(GO_RIGHT_BUTTONS))) {
     player_velocity.x += MOVEMENT_SPEED;
     direction = DIRECTION_RIGHT;
-    if (CheckCollisionRecs(player_right, ground)) player_velocity.x = 0;
   } else {
     player_velocity.x /= DECELERATION;
   }
@@ -126,19 +115,11 @@ void player_update(float deltaTime, Rectangle ground) {
   if (dashDuration <= 0) {
     update_gravity(deltaTime, ground);
     update_jump();
-    update_move(ground);
+    update_move();
   }
 
   player_rect.x += player_velocity.x * deltaTime;
   player_rect.y += player_velocity.y * deltaTime;
-  player_feet.x = player_rect.x + 1;
-  player_feet.y = player_rect.y + player_rect.height - 1;
-  player_head.x = player_rect.x + 1;
-  player_head.y = player_rect.y;
-  player_left.x = player_rect.x;
-  player_left.y = player_rect.y;
-  player_right.x = player_rect.x + player_rect.width - 1;
-  player_right.y = player_rect.y;
 }
 
 Rectangle player_get_rect() { return player_rect; }
@@ -150,5 +131,3 @@ int player_get_is_facing_right() { return direction; }
 float player_get_dash_cooldown() { return dashCooldown >= 0 ? dashCooldown : 0; }
 
 int player_get_can_double_jump() { return canDoubleJump; }
-
-Rectangle player_get_feet() { return player_feet; }

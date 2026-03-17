@@ -1,4 +1,5 @@
 #include "constants.h"
+#include "physics.h"
 #include "player.h"
 #include "raylib.h"
 
@@ -44,22 +45,24 @@ int main(void) {
   InitWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "our game");
 
   SetTargetFPS(FPS);
-  bool showDebugMenu;
+  bool showDebugMenu = true;
   Rectangle platform = {50, -30, 100, 10};
 
+  phys_init();
   player_init();
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
 
+
     player_update(deltaTime, platform);
     const Rectangle player_rect = player_get_rect();
 
     update_camera(player_rect.x, player_rect.y);
+    phys_step();
 
-    if (IsKeyPressed(SHOW_DEBUG_MENU_BUTTON))
-      showDebugMenu = !showDebugMenu;
-
+    // ---------------------
+    
     BeginDrawing();
     BeginMode2D(camera);
 
@@ -73,6 +76,9 @@ int main(void) {
     EndMode2D();
 
     // UI
+    if (IsKeyPressed(SHOW_DEBUG_MENU_BUTTON))
+      showDebugMenu = !showDebugMenu;
+
     if (showDebugMenu)
       show_debug_menu();
 
