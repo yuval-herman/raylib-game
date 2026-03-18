@@ -1,9 +1,15 @@
+#include "box2d.h"
 #include "constants.h"
+#include "id.h"
+#include "math_functions.h"
 #include "physics.h"
 #include "player.h"
 #include "raylib.h"
+#include "types.h"
+#include "utils.h"
 
 Camera2D camera = {.zoom = 1};
+b2BodyId platform_id = {0};
 
 void update_camera(float player_x, float player_y) {
   camera.offset.x = GetScreenWidth() / 2.0;
@@ -12,12 +18,18 @@ void update_camera(float player_x, float player_y) {
   camera.target.y = player_y;
 }
 
-void show_debug_menu() {
+void draw_debug_menu() {
   Vector2 player_position = player_get_postion();
+  b2Vec2 platform_postion = b2Body_GetPosition(platform_id);
+  
   const int font_size = 20;
   const int x_offset = 10;
   int y_offset = 10;
   DrawFPS(x_offset, y_offset);
+
+  DrawText(TextFormat("Platform Position: x: %.2f, y: %.2f", platform_postion.x,
+                      platform_postion.y),
+           x_offset, y_offset += font_size, font_size, BLACK);
 
   DrawText(TextFormat("Position: x: %.2f, y: %.2f", player_position.x,
                       player_position.y),
@@ -44,12 +56,21 @@ int main(void) {
   SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
   InitWindow(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT, "our game");
 
+  phys_init();
+  player_init();
+
   SetTargetFPS(FPS);
   bool showDebugMenu = true;
   Rectangle platform = {50, -30, 100, 10};
 
-  phys_init();
-  player_init();
+  b2BodyDef bodyDef = b2DefaultBodyDef();
+  bodyDef.position = R2BV2(platform);
+  bodyDef.type = b2_staticBody;
+  platform_id = b2CreateBody(worldId, &bodyDef);
+
+  b2ShapeDef shapeDef = b2DefaultShapeDef();
+  b2Polygon polygon = b2MakeBox(platform.width / 2.0f, platform.width / 2.0f);
+  b2CreatePolygonShape(platform_id, &shapeDef, &polygon);
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
@@ -79,7 +100,7 @@ int main(void) {
       showDebugMenu = !showDebugMenu;
 
     if (showDebugMenu)
-      show_debug_menu();
+      draw_debug_menu();
 
     EndDrawing();
   }
